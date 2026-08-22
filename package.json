@@ -2,7 +2,7 @@
   "name": "bolaget-plus",
   "description": "Bolaget+ is a browser extension that adds more features to Systembolaget's website.",
   "private": true,
-  "version": "1.5.1",
+  "version": "1.5.2",
   "type": "module",
   "author": "BroadcastDivers",
   "scripts": {
