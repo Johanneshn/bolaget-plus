@@ -1,7 +1,11 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { getCardName, isCardBottle } from '@/components/productUtils'
+import {
+  getCardName,
+  getProductName,
+  isCardBottle
+} from '@/components/productUtils'
 
 // A list card as Systembolaget renders it: category line, name, subtitle,
 // the "Nr {productNumber}" line, then the format/price details.
@@ -38,6 +42,19 @@ function renderPageData(products: object[]): void {
     props: { pageProps: { fallback: { '/api/search': { products } } } }
   })
   document.head.appendChild(script)
+}
+
+// The same title as a product page renders it: one <h1> holding the name and
+// the subtitle that carries the appellation/grape and the vintage. Appended
+// rather than assigned so a card and a product page can coexist in one test.
+function renderProductPage(title: string, subtitle?: string): void {
+  const lines = subtitle === undefined ? [title] : [title, subtitle]
+  document.body.insertAdjacentHTML(
+    'beforeend',
+    `<main><h1>${lines
+      .map((line) => `<span>${line}</span>`)
+      .join('')}</h1></main>`
+  )
 }
 
 beforeEach(() => {
@@ -113,15 +130,64 @@ describe('isCardBottle', () => {
 })
 
 describe('getCardName', () => {
-  it('joins the name and vintage above the product-number line', () => {
+  it('joins the name and subtitle above the product-number line', () => {
+    const card = renderCard({
+      subtitle: 'Brunello di Montalcino, 2021',
+      title: 'Armatura'
+    })
+
+    expect(getCardName(card)).toBe('Armatura Brunello di Montalcino')
+  })
+
+  it('drops a subtitle that is nothing but the vintage', () => {
     const card = renderCard({})
 
-    expect(getCardName(card)).toBe('Amadio 2021')
+    expect(getCardName(card)).toBe('Amadio')
   })
 
   it('drops the category line', () => {
     const card = renderCard({ subtitle: '' })
 
     expect(getCardName(card)).toBe('Amadio')
+  })
+})
+
+describe('getProductName', () => {
+  it('joins the name and subtitle, without the vintage', () => {
+    renderProductPage('Armatura', 'Brunello di Montalcino, 2021')
+
+    expect(getProductName()).toBe('Armatura Brunello di Montalcino')
+  })
+
+  it('drops a subtitle that is nothing but the vintage', () => {
+    renderProductPage('Amadio', '2021')
+
+    expect(getProductName()).toBe('Amadio')
+  })
+
+  it('returns the name alone when the title has no subtitle', () => {
+    renderProductPage('Amadio')
+
+    expect(getProductName()).toBe('Amadio')
+  })
+})
+
+// The two views share one cache entry (keyed on the product number), so a card
+// and the product page it links to must search for the exact same name —
+// otherwise the same wine is badged with two different Vivino entries
+// depending on where it is read, and on which view fetched first.
+describe('the list card and the product page agree', () => {
+  it.each([
+    ['Armatura', 'Brunello di Montalcino, 2021'],
+    ['Amadio', '2021'],
+    ['Barone Ricasoli', 'Brolio Chianti Classico, 2021'],
+    ['Omnipollo', 'Fatamorgana']
+  ])('derives one name for %s', (title, subtitle) => {
+    const card = renderCard({ subtitle, title })
+    renderProductPage(title, subtitle)
+
+    // Asserted rather than implied: two nulls would satisfy the comparison.
+    expect(getCardName(card)).not.toBeNull()
+    expect(getCardName(card)).toBe(getProductName())
   })
 })

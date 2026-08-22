@@ -6,6 +6,10 @@ import { ProductType } from '@/@types/types'
 const CATEGORY_LINE =
   /^(blanddryck|cider|mousserande|rosé|rött vin|vin|vitt vin|öl)[^,]*,/i
 
+// A subtitle that is nothing but the vintage ("2021"), as products without a
+// grape or appellation line render it.
+const VINTAGE_ONLY = /^(19|20)\d{2}$/
+
 export function getCardName(card: Element): null | string {
   const productId = getCardProductId(card)
   if (!productId) return null
@@ -24,13 +28,7 @@ export function getCardName(card: Element): null | string {
   }
   if (titleLines.some((line) => CATEGORY_LINE.test(line))) return null
 
-  // Normalize ", 2025" → " 2025" so vintage year is included without comma
-  return (
-    titleLines
-      .join(' ')
-      .replace(/,\s*(\d{4})/, ' $1')
-      .trim() || null
-  )
+  return buildSearchName(titleLines[0], titleLines[1] ?? '') || null
 }
 
 export function getCardProductId(card: Element): null | string {
@@ -59,16 +57,13 @@ export function getProductName(): null | string {
   //eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const firstLine = (headerChildren[0] as HTMLElement).innerText.trim() ?? ''
   if (headerChildren.length === 1) {
-    return firstLine
+    return buildSearchName(firstLine, '')
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const secondLine = (headerChildren[1] as HTMLElement).innerText.trim() ?? ''
-  const secondLineWithoutComma = secondLine.includes(',')
-    ? secondLine.slice(0, secondLine.lastIndexOf(',')).trim()
-    : secondLine
 
-  return `${firstLine} ${secondLineWithoutComma}`.trim()
+  return buildSearchName(firstLine, secondLine)
 }
 
 export function getProductType(): ProductType {
@@ -199,6 +194,27 @@ function buildPackagingMap(raw: string): Map<string, string> {
   }
 
   return map
+}
+
+// Turns the two title lines Systembolaget renders — the name and a subtitle
+// that ends in the vintage ("Brunello di Montalcino, 2021", or just "2021") —
+// into the name searched for on Vivino/Untappd. Both the product page and a
+// list card go through here: they used to derive the query differently, one
+// dropping the vintage and one keeping it, so the same wine was badged with
+// two different Vivino entries depending on which view it was read from.
+// The vintage is dropped because Vivino indexes a wine under one name for all
+// its vintages — the year is absent from every hit's name, so carrying it into
+// the query only drags the name similarity down, blocks an exact-name match,
+// and shifts Algolia's ranking towards unrelated wines. The rating displayed
+// is Vivino's pooled wine-level average across vintages either way.
+function buildSearchName(name: string, subtitle: string): string {
+  const withoutVintage = subtitle.includes(',')
+    ? subtitle.slice(0, subtitle.lastIndexOf(',')).trim()
+    : subtitle.trim()
+
+  return VINTAGE_ONLY.test(withoutVintage)
+    ? name.trim()
+    : `${name} ${withoutVintage}`.trim()
 }
 
 function extractProductId(url: string): null | string {
