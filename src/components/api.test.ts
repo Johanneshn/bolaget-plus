@@ -125,6 +125,95 @@ describe('fetchRatingFromVivino', () => {
     expect(result.status).toBe(RatingResultStatus.Uncertain)
   })
 
+  it('accepts a hit the page producer confirms but the title cannot', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            id: 20,
+            name: 'Mucho Mas Merlot',
+            statistics: { ratings_average: 3.4, ratings_count: 120 },
+            winery: { name: 'Mucho Mas' }
+          },
+          {
+            id: 21,
+            name: 'Mucho Más Tinto',
+            statistics: { ratings_average: 4.0, ratings_count: 15500 },
+            winery: { name: 'Félix Solís' }
+          }
+        ],
+        nbHits: 240
+      })
+    )
+
+    const result = await fetchRatingFromVivino(
+      'Mucho Mas',
+      false,
+      'Félix Solís Avantis'
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Found)
+    expect(result.name).toBe('Félix Solís Mucho Más Tinto')
+    expect(result.rating).toBe(4.0)
+  })
+
+  it("prefers the wine asked for over the producer's line extension", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            id: 22,
+            name: 'Mucho Mas Gold',
+            statistics: { ratings_average: 3.9, ratings_count: 300 },
+            winery: { name: 'Félix Solís' }
+          },
+          {
+            id: 23,
+            name: 'Mucho Más Tinto',
+            statistics: { ratings_average: 4.0, ratings_count: 15500 },
+            winery: { name: 'Félix Solís' }
+          }
+        ],
+        nbHits: 240
+      })
+    )
+
+    const result = await fetchRatingFromVivino(
+      'Mucho Mas',
+      false,
+      'Félix Solís Avantis'
+    )
+
+    // "Gold" is a word the Systembolaget title never mentions; "Tinto" is a
+    // colour it is free to leave out.
+    expect(result.name).toBe('Félix Solís Mucho Más Tinto')
+  })
+
+  it('falls back to the title rules when the producer confirms nothing', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            id: 24,
+            name: 'Crianza',
+            statistics: { ratings_average: 4.1, ratings_count: 1200 },
+            winery: { name: 'El Coto' }
+          }
+        ],
+        nbHits: 100
+      })
+    )
+
+    const result = await fetchRatingFromVivino(
+      'El Coto Crianza',
+      false,
+      'Bodega Sin Relación'
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Found)
+    expect(result.name).toBe('El Coto Crianza')
+  })
+
   it('ignores hidden hits', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({

@@ -35,6 +35,10 @@ export interface RatingRequest {
   // List-page badges never render images, so they skip the thumbnail
   // download; product pages opt in.
   includeImage?: boolean
+  // The producer Systembolaget names for the product, when its embedded page
+  // data carries one. Vivino's index keys the producer separately from the
+  // wine name, so this confirms a match the title alone cannot.
+  producer?: string
   productId: string
   productName: string
   query: ProductType

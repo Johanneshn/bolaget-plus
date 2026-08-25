@@ -65,12 +65,16 @@ browser.runtime.onMessage.addListener(async (message: unknown) => {
   if (!isGetRatingMessage(message)) {
     return
   }
-  const { includeImage, productName, query } = message
+  const { includeImage, producer, productName, query } = message
   switch (query) {
     case ProductType.Beer:
     case ProductType.Cider:
       return await fetchRatingFromUntappd(productName, await getSearchConfig())
     case ProductType.Wine:
-      return await fetchRatingFromVivino(productName, includeImage ?? true)
+      return await fetchRatingFromVivino(
+        productName,
+        includeImage ?? true,
+        producer
+      )
   }
 })

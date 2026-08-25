@@ -89,7 +89,11 @@ external fetches are delegated to the background script.
 5. `api.ts` scores candidates with `string-similarity`. A Vivino match must
    additionally be confirmed by the producer (`queryContainsWinery`) or be an
    exact name hit on a distinctive title — see the comments in that file for
-   the regressions each rule guards. Unconfirmed candidates return
+   the regressions each rule guards. When Systembolaget's own page data names
+   the producer, `productUtils.getProducer` passes it along and a hit whose
+   winery *that* confirms wins outright (`bestFromProducer`): a title which is
+   nothing but a brand ("Mucho Mas") cannot otherwise be told apart from an
+   unrelated winery of the same name. Unconfirmed candidates return
    `RatingResultStatus.Uncertain` with up to 3 ranked alternatives and a
    search link rather than a wrong rating; an empty Untappd result returns
    `NotFound`.

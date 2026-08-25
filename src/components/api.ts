@@ -47,8 +47,11 @@ const IMAGE_FETCH_TIMEOUT_MS = 4000
 // threshold even when the producer is completely different. The distinguishing
 // signal is the producer — enforced by the winery check below.
 const GENERIC_WINE_WORDS = new Set([
+  'bianco',
   'blanc',
+  'blanco',
   'blancs',
+  'branco',
   'brut',
   'cava',
   'champagne',
@@ -71,13 +74,17 @@ const GENERIC_WINE_WORDS = new Set([
   'reserva',
   'reserve',
   'riserva',
+  'rosado',
+  'rosato',
   'rose',
   'rosé',
+  'rosso',
   'rouge',
   'sec',
   'sparkling',
   'spumante',
   'superiore',
+  'tinto',
   'vintage',
   'wine'
 ])
@@ -85,6 +92,10 @@ const GENERIC_WINE_WORDS = new Set([
 // How close two brand-like tokens must be to count as the same producer;
 // tolerates minor spelling/plural differences without matching unrelated words.
 const BRAND_TOKEN_MATCH_THRESHOLD = 0.8
+
+// How well a candidate's name has to match the Systembolaget title before any
+// producer evidence is even considered.
+const MIN_NAME_SIMILARITY = 0.5
 
 // An exact name only identifies a wine when that name is rare in the index.
 // Distinctive titles ("Contacto Loureiro", "Barbera d'Alba Busije") match a
@@ -123,6 +134,7 @@ const WINERY_COMPANY_WORDS = new Set([
   'famille',
   'family',
   'fratelli',
+  'freres',
   'frères',
   'hermanos',
   'maison',
@@ -142,6 +154,19 @@ const WINERY_COMPANY_WORDS = new Set([
   'winery',
   'winzer'
 ])
+
+// A Vivino hit with everything the matching rules weigh: how close its name is
+// to the Systembolaget title (with the producer prefixed, and without), which
+// of its own words the title never mentions, and the producer Vivino files it
+// under.
+type ScoredWine = RatingResponse & {
+  exactNameMatch: boolean
+  imageUrl?: string
+  similarityRate: number
+  unmatchedWords: number
+  wineNameRate: number
+  winery?: string
+}
 
 // Fetched by the background script because the systembolaget.se page CSP
 // (img-src) blocks hotlinking Vivino's image hosts; a data: URL is allowed.
@@ -277,6 +302,7 @@ export async function fetchRatingFromUntappd(
 export async function fetchRatingFromVivino(
   query: string,
   includeImage = true,
+  producer?: string,
   fetchImage: (
     url: string | undefined
   ) => Promise<string | undefined> = fetchImageAsDataUrl
@@ -319,13 +345,6 @@ export async function fetchRatingFromVivino(
       return uncertainFallback
     }
 
-    type ScoredWine = RatingResponse & {
-      exactNameMatch: boolean
-      imageUrl?: string
-      similarityRate: number
-      winery?: string
-    }
-
     const scored = hits
       .map((hit: VivinoHit): ScoredWine => {
         const winery = hit.winery?.name ?? undefined
@@ -352,12 +371,18 @@ export async function fetchRatingFromVivino(
           rating,
           similarityRate: similarity(query, fullName),
           status: RatingResultStatus.Found,
+          unmatchedWords: countUnmatchedWords(query, hit.name),
           votes,
+          wineNameRate: similarity(query, hit.name),
           winery
         }
       })
       .sort((a, b) => b.similarityRate - a.similarityRate)
 
+    // Whoever Systembolaget names as the producer gets the first word (see
+    // bestFromProducer); the rules below are what is left when the page data
+    // carries no producer, as it does not after an SPA navigation.
+    //
     // A name-similarity built on shared style words ("Prosecco Extra Dry") is
     // not a real match unless the producer also lines up: the winery must be
     // confirmed by the query. Checked down the ranking, not only on the top
@@ -370,12 +395,14 @@ export async function fetchRatingFromVivino(
     // against "R Riesling Organic", a different producer's wine.
     const nameIsDistinctive =
       (data.nbHits ?? Infinity) <= MAX_HITS_FOR_EXACT_NAME_MATCH
-    const bestMatch = scored.find(
-      (wine) =>
-        wine.similarityRate >= 0.5 &&
-        (queryContainsWinery(query, wine.winery) ||
-          (wine.exactNameMatch && nameIsDistinctive))
-    )
+    const bestMatch =
+      bestFromProducer(scored, producer) ??
+      scored.find(
+        (wine) =>
+          wine.similarityRate >= MIN_NAME_SIMILARITY &&
+          (queryContainsWinery(query, wine.winery) ||
+            (wine.exactNameMatch && nameIsDistinctive))
+      )
 
     if (!bestMatch) {
       const top = scored.slice(0, MAX_ALTERNATIVES)
@@ -420,13 +447,69 @@ export async function fetchUntappdSearchConfig(): Promise<UntappdSearchConfig> {
   }
 }
 
-// Splits text into lowercased, distinctive tokens: drops short filler ("de",
-// "di", "el"), bare vintage years, and the generic style words above, leaving
-// the brand/producer words that actually identify a wine.
+// The best candidate Systembolaget's own producer vouches for, if any.
+// Consulted before the title-based rules: naming the producer is harder
+// evidence than anything the title carries, so it both finds the wine whose
+// title alone can never confirm it ("Mucho Mas" under winery "Félix Solís")
+// and outranks a same-named wine from an unrelated producer (a Chilean winery
+// literally called "Mucho Mas", which that title trivially "confirms").
+function bestFromProducer(
+  candidates: ScoredWine[],
+  producer: string | undefined
+): ScoredWine | undefined {
+  if (!producer) {
+    return undefined
+  }
+  return (
+    candidates
+      // The bare wine name counts too: a title that omits the producer scores
+      // poorly against a name we prefixed the producer onto.
+      .filter(
+        (wine) =>
+          Math.max(wine.similarityRate, wine.wineNameRate) >=
+            MIN_NAME_SIMILARITY && queryContainsWinery(producer, wine.winery)
+      )
+      // Within one producer's range the title is all that separates the wines,
+      // so a name spending a word the title never mentions ("Mucho Mas Gold")
+      // loses to one that spends none. Colours don't count — they are style
+      // words a Systembolaget title is free to leave out.
+      .sort(
+        (a, b) =>
+          a.unmatchedWords - b.unmatchedWords || b.wineNameRate - a.wineNameRate
+      )[0]
+  )
+}
+
+// True when `token` appears in `tokens`, allowing the spelling drift between
+// the two catalogues ("Solis"/"Solís", singular/plural).
+function containsToken(tokens: string[], token: string): boolean {
+  return tokens.some(
+    (candidate) =>
+      candidate === token ||
+      stringSimilarity.compareTwoStrings(candidate, token) >=
+        BRAND_TOKEN_MATCH_THRESHOLD
+  )
+}
+
+// How many distinctive words of a wine's name the Systembolaget title never
+// accounts for — the signal that separates a producer's line extension from
+// the wine actually being looked at.
+function countUnmatchedWords(query: string, name: string): number {
+  const queryTokens = distinctiveTokens(query)
+  return distinctiveTokens(name).filter(
+    (token) => !containsToken(queryTokens, token)
+  ).length
+}
+
+// Splits text into distinctive tokens: drops short filler ("de", "di", "el"),
+// bare vintage years, and the generic style words above, leaving the
+// brand/producer words that actually identify a wine. Built on the same
+// diacritic folding as the name comparison, because the two catalogues
+// disagree about accents — Systembolaget writes "Felix Solis" where Vivino
+// writes "Félix Solís", and "mas"/"más" share no bigram at all.
 function distinctiveTokens(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
+  return normalize(text)
+    .split(' ')
     .filter(
       (token) =>
         token.length > 2 &&
@@ -515,12 +598,7 @@ function queryContainsWinery(
   }
   const queryTokens = distinctiveTokens(query)
   return wineryTokens.every((wineryToken) =>
-    queryTokens.some(
-      (queryToken) =>
-        queryToken === wineryToken ||
-        stringSimilarity.compareTwoStrings(wineryToken, queryToken) >=
-          BRAND_TOKEN_MATCH_THRESHOLD
-    )
+    containsToken(queryTokens, wineryToken)
   )
 }
 

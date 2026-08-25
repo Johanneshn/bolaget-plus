@@ -17,10 +17,17 @@ export async function fetchRating(
   productId: string,
   productName: string,
   type: ProductType,
-  includeImage = false
+  includeImage = false,
+  producer?: string
 ): Promise<RatingResponse> {
   try {
-    const ratingRequest = { includeImage, productId, productName, query: type }
+    const ratingRequest = {
+      includeImage,
+      producer,
+      productId,
+      productName,
+      query: type
+    }
     const cachedRating = await tryGetRating(ratingRequest)
     // An entry cached by a list page has no thumbnails; when the product
     // page asks for images, refetch instead of serving the imageless copy.
@@ -64,6 +71,7 @@ async function fetchFromSource(
     return await fetchRatingFromVivino(
       ratingRequest.productName,
       ratingRequest.includeImage ?? true,
+      ratingRequest.producer,
       fetchImageViaBackground
     )
   }
@@ -106,7 +114,8 @@ let listFetchQueue: Promise<undefined> = Promise.resolve(undefined)
 export async function enqueueListFetch(
   productId: string,
   productName: string,
-  type: ProductType
+  type: ProductType,
+  producer?: string
 ): Promise<RatingResponse> {
   // Cached ratings render immediately — only real network fetches go through
   // the throttled queue, so a revisited list page fills in instantly instead
@@ -125,7 +134,9 @@ export async function enqueueListFetch(
     () =>
       new Promise<RatingResponse>((resolve) => {
         setTimeout(() => {
-          void fetchRating(productId, productName, type).then(resolve)
+          void fetchRating(productId, productName, type, false, producer).then(
+            resolve
+          )
         }, LIST_FETCH_DELAY_MS)
       })
   )

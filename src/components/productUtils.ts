@@ -10,6 +10,12 @@ const CATEGORY_LINE =
 // grape or appellation line render it.
 const VINTAGE_ONLY = /^(19|20)\d{2}$/
 
+// What the embedded page data tells us about a product beyond its name.
+interface PageProduct {
+  packaging?: string
+  producer?: string
+}
+
 export function getCardName(card: Element): null | string {
   const productId = getCardProductId(card)
   if (!productId) return null
@@ -41,6 +47,14 @@ export function getCardProductType(card: Element): ProductType {
   if (href.includes('/produkt/ol/')) return ProductType.Beer
   if (href.includes('/produkt/cider-blanddrycker/')) return ProductType.Cider
   return ProductType.Uncertain
+}
+
+// The producer Systembolaget names for a product, for the Vivino lookup to
+// confirm a winery with. Only the embedded page data carries it, so it is
+// missing after an SPA navigation to a product the loaded payload never held —
+// the lookup then falls back to judging the title alone, as it always has.
+export function getProducer(productId: string): null | string {
+  return getProductFromPageData(productId)?.producer ?? null
 }
 
 export function getProductId(): null | string {
@@ -151,8 +165,8 @@ export function isListPage(): boolean {
   return window.location.pathname.includes('/sortiment/')
 }
 
-function buildPackagingMap(raw: string): Map<string, string> {
-  const map = new Map<string, string>()
+function buildProductMap(raw: string): Map<string, PageProduct> {
+  const map = new Map<string, PageProduct>()
 
   let root: unknown
   try {
@@ -181,14 +195,22 @@ function buildPackagingMap(raw: string): Map<string, string> {
 
     const product = node as {
       packagingLevel1?: unknown
+      producerName?: unknown
       productNumber?: unknown
     }
-    if (
-      typeof product.productNumber === 'string' &&
-      typeof product.packagingLevel1 === 'string' &&
-      product.packagingLevel1
-    ) {
-      map.set(product.productNumber, product.packagingLevel1.toLowerCase())
+    if (typeof product.productNumber === 'string') {
+      const packaging = readString(product.packagingLevel1)?.toLowerCase()
+      const producer = readString(product.producerName)
+      // The payload nests the same product under several keys, and not every
+      // copy is complete — keep the fields already found rather than letting a
+      // sparser copy blank them.
+      const known = map.get(product.productNumber)
+      if (packaging ?? producer) {
+        map.set(product.productNumber, {
+          packaging: packaging ?? known?.packaging,
+          producer: producer ?? known?.producer
+        })
+      }
     }
     queue.push(...(Object.values(node) as unknown[]))
   }
@@ -271,21 +293,26 @@ function getPackagingDescriptor(main: HTMLElement): null | string {
 
 // Systembolaget embeds the data of the initially loaded page in Next.js'
 // __NEXT_DATA__ script; "packagingLevel1" is the packaging name ("Flaska",
-// "Box", …). A product page carries one product, a list page the first page of
-// results, so index whatever is there and only trust an entry that matches the
-// product being asked about — SPA navigations don't refresh the script.
-let packagingCache: null | { map: Map<string, string>; raw: string } = null
+// "Box", …) and "producerName" the producer. A product page carries one
+// product, a list page the first page of results, so index whatever is there
+// and only trust an entry that matches the product being asked about — SPA
+// navigations don't refresh the script.
+let pageDataCache: null | { map: Map<string, PageProduct>; raw: string } = null
 
 function getPackagingFromPageData(productId: string): null | string {
+  return getProductFromPageData(productId)?.packaging ?? null
+}
+
+function getProductFromPageData(productId: string): null | PageProduct {
   const raw = document.getElementById('__NEXT_DATA__')?.textContent
   if (!raw) {
     return null
   }
 
-  if (packagingCache?.raw !== raw) {
-    packagingCache = { map: buildPackagingMap(raw), raw }
+  if (pageDataCache?.raw !== raw) {
+    pageDataCache = { map: buildProductMap(raw), raw }
   }
-  return packagingCache.map.get(productId) ?? null
+  return pageDataCache.map.get(productId) ?? null
 }
 
 function getSelectedPackaging(main: HTMLElement): null | string {
@@ -311,4 +338,12 @@ function getSelectedPackaging(main: HTMLElement): null | string {
 // the free-form card text NON_BOTTLE_PATTERN guards.
 function isNonBottlePackaging(descriptor: string): boolean {
   return NON_BOTTLE_FORMATS.some((format) => descriptor.includes(format))
+}
+
+function readString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+  const trimmed = value.trim()
+  return trimmed ? trimmed : undefined
 }
