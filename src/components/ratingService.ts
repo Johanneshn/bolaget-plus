@@ -2,6 +2,7 @@ import browser from 'webextension-polyfill'
 
 import {
   ImageRequest,
+  ProductFacts,
   ProductType,
   RatingRequest,
   RatingResponse,
@@ -18,12 +19,12 @@ export async function fetchRating(
   productName: string,
   type: ProductType,
   includeImage = false,
-  producer?: string
+  facts: ProductFacts = {}
 ): Promise<RatingResponse> {
   try {
     const ratingRequest = {
+      ...facts,
       includeImage,
-      producer,
       productId,
       productName,
       query: type
@@ -71,7 +72,7 @@ async function fetchFromSource(
     return await fetchRatingFromVivino(
       ratingRequest.productName,
       ratingRequest.includeImage ?? true,
-      ratingRequest.producer,
+      { country: ratingRequest.country, producer: ratingRequest.producer },
       fetchImageViaBackground
     )
   }
@@ -115,14 +116,14 @@ export async function enqueueListFetch(
   productId: string,
   productName: string,
   type: ProductType,
-  producer?: string
+  facts: ProductFacts = {}
 ): Promise<RatingResponse> {
   // Cached ratings render immediately — only real network fetches go through
   // the throttled queue, so a revisited list page fills in instantly instead
   // of trickling one badge per delay tick.
   const cached = await tryGetRating({
+    ...facts,
     includeImage: false,
-    producer,
     productId,
     productName,
     query: type
@@ -135,7 +136,7 @@ export async function enqueueListFetch(
     () =>
       new Promise<RatingResponse>((resolve) => {
         setTimeout(() => {
-          void fetchRating(productId, productName, type, false, producer).then(
+          void fetchRating(productId, productName, type, false, facts).then(
             resolve
           )
         }, LIST_FETCH_DELAY_MS)

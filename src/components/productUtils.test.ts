@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  getCardCountry,
   getCardName,
   getProducer,
   getProductName,
@@ -127,6 +128,48 @@ describe('isCardBottle', () => {
     card.innerHTML = '<p>Amadio</p><p>Box, 3000 ml</p>'
 
     expect(isCardBottle(card, '203701')).toBe(true)
+  })
+})
+
+describe('getCardCountry', () => {
+  it('reads the country out of a detail line', () => {
+    const card = renderCard({
+      details: ['Spanien, Kastilien-La Mancha', 'Flaska, 750 ml', '99:00']
+    })
+
+    expect(getCardCountry(card, '203701')).toBe('es')
+  })
+
+  it('matches the country however the line is punctuated', () => {
+    const card = renderCard({
+      details: ['Flaska · 750 ml · Sydafrika', '129:00']
+    })
+
+    expect(getCardCountry(card, '203701')).toBe('za')
+  })
+
+  it('folds the Swedish spelling to the same code as the English one', () => {
+    const card = renderCard({ details: ['Österrike', '129:00'] })
+
+    expect(getCardCountry(card, '203701')).toBe('at')
+  })
+
+  it('ignores a country word in the wine name', () => {
+    // The two lines above the product number are the name and subtitle; a wine
+    // called "Chile" is not a country line.
+    const card = renderCard({
+      details: ['Flaska, 750 ml', '99:00'],
+      subtitle: 'Chile',
+      title: 'Chile'
+    })
+
+    expect(getCardCountry(card, '203701')).toBeNull()
+  })
+
+  it('is null when no line names a country it knows', () => {
+    const card = renderCard({ details: ['Flaska, 750 ml', '99:00'] })
+
+    expect(getCardCountry(card, '203701')).toBeNull()
   })
 })
 

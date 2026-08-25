@@ -5,11 +5,18 @@ import { RatingRequest, RatingResponse } from '@/@types/types'
 
 const CACHE_EXPIRATION_DAYS = 1
 
-// The per-entry metadata @wxt-dev/storage keeps alongside a cached rating.
+// The per-entry metadata @wxt-dev/storage keeps alongside a cached rating:
+// when it was written, and what Systembolaget had told the lookup about the
+// product at the time.
 type CacheMeta = Record<string, unknown> & {
+  country?: null | string
   datetime: string
   producer?: null | string
 }
+
+// The facts a match can be made with. A card and a product page read different
+// ones, which is what makes an entry worth replacing.
+const FACT_KEYS = ['country', 'producer'] as const
 
 const RATINGS_KEY_PREFIX = 'ratings:'
 // @wxt-dev/storage stores an item's metadata under `<key>$`.
@@ -86,10 +93,12 @@ export async function saveRating(
   await Promise.all([
     storage.setItem(key, rating),
     storage.setMeta(key, {
+      // What the match was made knowing. Stored so a later lookup that knows
+      // more is not served an answer reached with less — see tryGetRating.
+      // Written as null rather than left out, so a field really is cleared
+      // when an entry is replaced by a lookup that lacks it.
+      country: ratingRequest.country ?? null,
       datetime: new Date().toISOString(),
-      // What the match was made to know. Stored so a later lookup that knows
-      // more is not served an answer that was reached with less — see
-      // tryGetRating.
       producer: ratingRequest.producer ?? null
     })
   ])
@@ -112,13 +121,10 @@ export async function tryGetRating(
   // One product is looked up from two places — its list card and its product
   // page — and they must land on the same wine. They share this entry, which
   // settles it, but only if the better-informed lookup gets to write it: a
-  // card whose page data doesn't reach that far cannot see the producer, and
-  // a match made without it is not one the product page may then be served.
-  // Left in place rather than evicted; the refetch overwrites it.
-  if (
-    ratingRequest.producer !== undefined &&
-    (metadata.producer ?? undefined) !== ratingRequest.producer
-  ) {
+  // card can read the country off its own text and nothing else, while the
+  // product page also knows the producer. Left in place rather than evicted;
+  // the refetch that follows overwrites it.
+  if (knowsMoreThanCached(ratingRequest, metadata)) {
     return null
   }
   const diffDays = calculateDaysDifference(
@@ -143,4 +149,24 @@ function calculateDaysDifference(date1: Date, date2: Date): number {
 
 function generateCacheKey(ratingRequest: RatingRequest): `local:${string}` {
   return `local:ratings:${ratingRequest.productId}-${ratingRequest.query}`
+}
+
+// Whether this lookup can improve on the cached match — it knows a fact the
+// entry was matched without, and lacks none the entry had. Requiring it to
+// lack none is what keeps two half-informed views from taking turns
+// overwriting each other forever.
+function knowsMoreThanCached(
+  ratingRequest: RatingRequest,
+  metadata: CacheMeta
+): boolean {
+  const cached = (key: (typeof FACT_KEYS)[number]) => metadata[key] ?? undefined
+  return (
+    FACT_KEYS.some(
+      (key) =>
+        ratingRequest[key] !== undefined && cached(key) !== ratingRequest[key]
+    ) &&
+    !FACT_KEYS.some(
+      (key) => cached(key) !== undefined && ratingRequest[key] === undefined
+    )
+  )
 }

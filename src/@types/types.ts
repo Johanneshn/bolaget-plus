@@ -23,6 +23,18 @@ export interface ImageRequest {
   url: string
 }
 
+// What Systembolaget tells us about a product beyond its name. Neither field
+// is always readable — a list card and a product page expose different things
+// — so every rule that uses one must treat it as absent without complaint.
+export interface ProductFacts {
+  // ISO alpha-2, folded from the Swedish country name Systembolaget prints
+  // ("Spanien" → "es"). Rules out a same-named wine from another country.
+  country?: string
+  // Vivino's index keys the producer separately from the wine name, so this
+  // confirms a match the title alone cannot.
+  producer?: string
+}
+
 export interface RatingAlternative {
   imageDataUrl?: string
   link: string
@@ -31,14 +43,10 @@ export interface RatingAlternative {
   votes: number
 }
 
-export interface RatingRequest {
+export type RatingRequest = ProductFacts & {
   // List-page badges never render images, so they skip the thumbnail
   // download; product pages opt in.
   includeImage?: boolean
-  // The producer Systembolaget names for the product, when its embedded page
-  // data carries one. Vivino's index keys the producer separately from the
-  // wine name, so this confirms a match the title alone cannot.
-  producer?: string
   productId: string
   productName: string
   query: ProductType
@@ -86,7 +94,15 @@ export interface UntappdSearchJSON {
   hits?: UntappdHit[]
 }
 
+// Vivino writes a hit's country in more than one shape depending on the index
+// build — a nested object, a bare code, or a name — so it is read defensively.
+export type VivinoCountry =
+  | null
+  | string
+  | { code?: null | string; name?: null | string }
+
 export interface VivinoHit {
+  country?: VivinoCountry
   hidden?: boolean
   id: number
   image?: {
@@ -96,6 +112,11 @@ export interface VivinoHit {
     }
   }
   name: string
+  region?: null | {
+    country?: VivinoCountry
+    country_code?: null | string
+    name?: null | string
+  }
   statistics?: {
     ratings_average: null | number
     ratings_count: null | number

@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import type { VivinoHit } from '../src/@types/types'
+
 import { RatingResultStatus, UntappdSearchConfig } from '../src/@types/types'
 import {
   fetchRatingFromUntappd,
@@ -52,6 +54,56 @@ test.describe('API Integration Tests', () => {
 
     expect(result.status).toBe(RatingResultStatus.Found)
     expect(result.votes).toBeGreaterThan(10000)
+  })
+
+  // The country filter is only worth anything if Vivino's index actually
+  // carries a country, and it is read from whichever of several shapes the
+  // index build happens to use. This test is what tells us the assumption
+  // still holds — if it fails, the filter has quietly stopped filtering.
+  test('the Vivino index carries a country the extension can read', async () => {
+    const response = await fetch(
+      'https://9takgwjuxl-dsn.algolia.net/1/indexes/WINES_prod/query',
+      {
+        body: JSON.stringify({
+          params: new URLSearchParams({
+            hitsPerPage: '1',
+            query: 'Casillero del Diablo Cabernet Sauvignon'
+          }).toString()
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Algolia-API-Key': '60c11b2f1068885161d95ca068d3a6ae',
+          'X-Algolia-Application-Id': '9TAKGWJUXL'
+        },
+        method: 'POST'
+      }
+    )
+    const data = (await response.json()) as { hits?: VivinoHit[] }
+    const hit = data.hits?.[0]
+
+    expect(hit).toBeDefined()
+    // Chile, whichever way this build of the index spells it.
+    const raw =
+      hit?.region?.country ?? hit?.region?.country_code ?? hit?.country
+    expect(raw, `no country on the hit: ${JSON.stringify(hit)}`).toBeDefined()
+  })
+
+  // The country of a Chilean wine must rule out a Spanish product, and the
+  // filter must not throw away the wine that is genuinely from there.
+  test('the live country filter keeps the right wine and drops the wrong one', async () => {
+    const right = await fetchRatingFromVivino(
+      'Casillero del Diablo Cabernet Sauvignon',
+      false,
+      { country: 'cl' }
+    )
+    expect(right.status).toBe(RatingResultStatus.Found)
+
+    const wrong = await fetchRatingFromVivino(
+      'Casillero del Diablo Cabernet Sauvignon',
+      false,
+      { country: 'se' }
+    )
+    expect(wrong.status).toBe(RatingResultStatus.Uncertain)
   })
 
   test('fetchRatingFromUntappd returns data for valid query', async () => {

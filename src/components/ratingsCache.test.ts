@@ -83,6 +83,28 @@ describe('ratingsCache', () => {
     await expect(tryGetRating(withProducer)).resolves.toEqual(rating)
   })
 
+  // Neither view sees everything: a card reads the country off its own text,
+  // the product page also knows the producer. Whichever knows less must not
+  // undo the other's match, or the two would take turns overwriting it.
+  it('keeps the entry for a lookup that knows less than it did', async () => {
+    await saveRating(
+      { ...request, country: 'es', producer: 'Felix Solis' },
+      rating
+    )
+
+    await expect(tryGetRating({ ...request, country: 'es' })).resolves.toEqual(
+      rating
+    )
+  })
+
+  it('refetches when the lookup adds the producer to what the card knew', async () => {
+    await saveRating({ ...request, country: 'es' }, rating)
+
+    await expect(
+      tryGetRating({ ...request, country: 'es', producer: 'Felix Solis' })
+    ).resolves.toBeNull()
+  })
+
   it('evicts an expired entry on read', async () => {
     await saveRating(request, rating)
     await fakeBrowser.storage.local.set({

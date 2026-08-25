@@ -146,11 +146,9 @@ describe('fetchRatingFromVivino', () => {
       })
     )
 
-    const result = await fetchRatingFromVivino(
-      'Mucho Mas',
-      false,
-      'Félix Solís Avantis'
-    )
+    const result = await fetchRatingFromVivino('Mucho Mas', false, {
+      producer: 'Félix Solís Avantis'
+    })
 
     expect(result.status).toBe(RatingResultStatus.Found)
     expect(result.name).toBe('Félix Solís Mucho Más Tinto')
@@ -178,11 +176,9 @@ describe('fetchRatingFromVivino', () => {
       })
     )
 
-    const result = await fetchRatingFromVivino(
-      'Mucho Mas',
-      false,
-      'Félix Solís Avantis'
-    )
+    const result = await fetchRatingFromVivino('Mucho Mas', false, {
+      producer: 'Félix Solís Avantis'
+    })
 
     // "Gold" is a word the Systembolaget title never mentions; "Tinto" is a
     // colour it is free to leave out.
@@ -204,14 +200,85 @@ describe('fetchRatingFromVivino', () => {
       })
     )
 
-    const result = await fetchRatingFromVivino(
-      'El Coto Crianza',
-      false,
-      'Bodega Sin Relación'
-    )
+    const result = await fetchRatingFromVivino('El Coto Crianza', false, {
+      producer: 'Bodega Sin Relación'
+    })
 
     expect(result.status).toBe(RatingResultStatus.Found)
     expect(result.name).toBe('El Coto Crianza')
+  })
+
+  it('rejects a same-named wine from another country', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            id: 30,
+            name: 'Mucho Mas Merlot',
+            region: { country: { code: 'cl', name: 'Chile' } },
+            statistics: { ratings_average: 3.4, ratings_count: 120 },
+            winery: { name: 'Mucho Mas' }
+          }
+        ],
+        nbHits: 240
+      })
+    )
+
+    // All a list card can read off itself is the country — and it is enough to
+    // rule out the Chilean namesake of a Spanish wine.
+    const result = await fetchRatingFromVivino('Mucho Mas', false, {
+      country: 'es'
+    })
+
+    expect(result.status).toBe(RatingResultStatus.Uncertain)
+    // Still worth suggesting: better a "did you mean" than an empty card.
+    expect(result.alternatives).toHaveLength(1)
+  })
+
+  it('keeps a hit whose country Vivino does not give', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            id: 31,
+            name: 'Crianza',
+            statistics: { ratings_average: 4.1, ratings_count: 1200 },
+            winery: { name: 'El Coto' }
+          }
+        ],
+        nbHits: 100
+      })
+    )
+
+    const result = await fetchRatingFromVivino('El Coto Crianza', false, {
+      country: 'es'
+    })
+
+    // An unknown country is not a mismatch.
+    expect(result.status).toBe(RatingResultStatus.Found)
+  })
+
+  it('reads the country from a bare region country code', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            id: 32,
+            name: 'Crianza',
+            region: { country_code: 'CL', name: 'Central Valley' },
+            statistics: { ratings_average: 4.1, ratings_count: 1200 },
+            winery: { name: 'El Coto' }
+          }
+        ],
+        nbHits: 100
+      })
+    )
+
+    const result = await fetchRatingFromVivino('El Coto Crianza', false, {
+      country: 'es'
+    })
+
+    expect(result.status).toBe(RatingResultStatus.Uncertain)
   })
 
   it('ignores hidden hits', async () => {
