@@ -586,6 +586,90 @@ test.describe('Vivino lookup misses (mocked fetch)', () => {
     expect(result.link).toBe('https://www.vivino.com/wines/222')
   })
 
+  // Regression (Systembolaget 5234001 "Mucho Mas"): the title is nothing but
+  // the brand, and an unrelated Chilean winery is literally called "Mucho
+  // Mas" — so its wines pass the winery check on a title that says nothing
+  // about the producer, while the wine actually on the shelf (Félix Solís'
+  // "Mucho Más Tinto", 15k+ ratings) fails it *and* the 0.5 name threshold,
+  // because the producer we prefix onto its name is absent from the title.
+  // Systembolaget names the producer on the page; that is what settles it.
+  test('matches a brand-only title through the producer on the page', async () => {
+    const hits = [
+      vivinoHit({
+        id: 5798850,
+        name: 'Mucho Mas Merlot',
+        statistics: { ratings_average: 3.3, ratings_count: 138 },
+        vintages: [{ id: 111, statistics: { ratings_count: 138 } }],
+        winery: { name: 'Mucho Mas' }
+      }),
+      vivinoHit({
+        id: 12200870,
+        name: 'Mucho Mas Gold',
+        statistics: { ratings_average: 3.9, ratings_count: 402 },
+        vintages: [{ id: 222, statistics: { ratings_count: 402 } }],
+        winery: { name: 'Félix Solís' }
+      }),
+      vivinoHit({
+        id: 6266660,
+        name: 'Mucho Más Tinto',
+        statistics: { ratings_average: 3.8, ratings_count: 15500 },
+        vintages: [{ id: 154917912, statistics: { ratings_count: 15500 } }],
+        winery: { name: 'Félix Solís' }
+      })
+    ]
+    globalThis.fetch = () => Promise.resolve(vivinoSearchResponse(hits, 240))
+
+    // Without the producer nothing in the title separates the three, and the
+    // namesake winery wins on name-similarity alone.
+    const blind = await fetchRatingFromVivino('Mucho Mas', false)
+    expect(blind.name).toBe('Mucho Mas Merlot')
+
+    // Systembolaget spells it without the accents Vivino uses, and adds the
+    // company form — neither may cost the match.
+    const result = await fetchRatingFromVivino(
+      'Mucho Mas',
+      false,
+      'Felix Solis Avantis'
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Found)
+    expect(result.name).toBe('Félix Solís Mucho Más Tinto')
+    expect(result.link).toBe('https://www.vivino.com/wines/154917912')
+  })
+
+  // A producer confirms who made the wine, not which of their wines it is:
+  // "Gold" is a word the Systembolaget title never mentions, while "Tinto" is
+  // a colour the title is free to leave out.
+  test('does not let the producer pull in a line extension', async () => {
+    globalThis.fetch = () =>
+      Promise.resolve(
+        vivinoSearchResponse([
+          vivinoHit({
+            id: 9240299,
+            name: 'Mucho Más Tinto - Black Edition',
+            statistics: { ratings_average: 4.0, ratings_count: 900 },
+            vintages: [{ id: 333, statistics: { ratings_count: 900 } }],
+            winery: { name: 'Félix Solís' }
+          }),
+          vivinoHit({
+            id: 5722875,
+            name: 'Mucho Más Blanco',
+            statistics: { ratings_average: 3.7, ratings_count: 4000 },
+            vintages: [{ id: 444, statistics: { ratings_count: 4000 } }],
+            winery: { name: 'Félix Solís' }
+          })
+        ])
+      )
+
+    const result = await fetchRatingFromVivino(
+      'Mucho Mas Blanco',
+      false,
+      'Felix Solis Avantis'
+    )
+
+    expect(result.name).toBe('Félix Solís Mucho Más Blanco')
+  })
+
   test('returns no alternatives when the search has no hits', async () => {
     globalThis.fetch = () => Promise.resolve(vivinoSearchResponse([]))
 

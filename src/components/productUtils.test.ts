@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
   getCardName,
+  getProducer,
   getProductName,
   isCardBottle
 } from '@/components/productUtils'
@@ -126,6 +127,53 @@ describe('isCardBottle', () => {
     card.innerHTML = '<p>Amadio</p><p>Box, 3000 ml</p>'
 
     expect(isCardBottle(card, '203701')).toBe(true)
+  })
+})
+
+describe('getProducer', () => {
+  it('reads the producer the embedded page data names', () => {
+    renderPageData([
+      {
+        packagingLevel1: 'Flaska',
+        producerName: 'Felix Solis',
+        productNumber: '5234001'
+      }
+    ])
+
+    expect(getProducer('5234001')).toBe('Felix Solis')
+  })
+
+  it('keeps a field a sparser copy of the same product omits', () => {
+    renderPageData([
+      {
+        packagingLevel1: 'Flaska',
+        producerName: 'Felix Solis',
+        productNumber: '5234001'
+      },
+      { packagingLevel1: 'Flaska', productNumber: '5234001' }
+    ])
+
+    expect(getProducer('5234001')).toBe('Felix Solis')
+  })
+
+  it('is null for a product the page data does not cover', () => {
+    renderPageData([
+      {
+        packagingLevel1: 'Flaska',
+        producerName: 'Felix Solis',
+        productNumber: '5234001'
+      }
+    ])
+
+    // What an SPA navigation leaves behind: the payload of the page that was
+    // loaded first, holding nothing about the product now on screen.
+    expect(getProducer('203701')).toBeNull()
+  })
+
+  it('is null when the product carries no producer', () => {
+    renderPageData([{ packagingLevel1: 'Box', productNumber: '203701' }])
+
+    expect(getProducer('203701')).toBeNull()
   })
 })
 

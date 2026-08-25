@@ -82,7 +82,12 @@ async function handleListCard(card: Element) {
   const spinner = domUtils.injectCardSpinner(card, productId)
   if (!spinner) return
 
-  const rating = await enqueueListFetch(productId, name, productType)
+  const rating = await enqueueListFetch(
+    productId,
+    name,
+    productType,
+    productUtils.getProducer(productId) ?? undefined
+  )
   domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
 }
 
@@ -132,7 +137,13 @@ async function tryInsertOnProductPage() {
   try {
     domUtils.showLoadingSpinner()
 
-    const rating = await fetchRating(productId, productName, productType, true)
+    const rating = await fetchRating(
+      productId,
+      productName,
+      productType,
+      true,
+      productUtils.getProducer(productId) ?? undefined
+    )
     if (activeRequest !== request) return
     handleRating(productType, rating)
   } catch {
