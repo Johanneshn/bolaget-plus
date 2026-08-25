@@ -5,6 +5,12 @@ import { RatingRequest, RatingResponse } from '@/@types/types'
 
 const CACHE_EXPIRATION_DAYS = 1
 
+// The per-entry metadata @wxt-dev/storage keeps alongside a cached rating.
+type CacheMeta = Record<string, unknown> & {
+  datetime: string
+  producer?: null | string
+}
+
 const RATINGS_KEY_PREFIX = 'ratings:'
 // @wxt-dev/storage stores an item's metadata under `<key>$`.
 const META_KEY_SUFFIX = '$'
@@ -80,7 +86,11 @@ export async function saveRating(
   await Promise.all([
     storage.setItem(key, rating),
     storage.setMeta(key, {
-      datetime: new Date().toISOString()
+      datetime: new Date().toISOString(),
+      // What the match was made to know. Stored so a later lookup that knows
+      // more is not served an answer that was reached with less — see
+      // tryGetRating.
+      producer: ratingRequest.producer ?? null
     })
   ])
 
@@ -93,9 +103,22 @@ export async function tryGetRating(
   const key = generateCacheKey(ratingRequest)
   const [cachedRating, metadata] = await Promise.all([
     storage.getItem<RatingResponse>(key),
-    storage.getMeta<{ datetime: string }>(key)
+    storage.getMeta<CacheMeta>(key)
   ])
   if (!cachedRating || !metadata.datetime) {
+    return null
+  }
+
+  // One product is looked up from two places — its list card and its product
+  // page — and they must land on the same wine. They share this entry, which
+  // settles it, but only if the better-informed lookup gets to write it: a
+  // card whose page data doesn't reach that far cannot see the producer, and
+  // a match made without it is not one the product page may then be served.
+  // Left in place rather than evicted; the refetch overwrites it.
+  if (
+    ratingRequest.producer !== undefined &&
+    (metadata.producer ?? undefined) !== ratingRequest.producer
+  ) {
     return null
   }
   const diffDays = calculateDaysDifference(

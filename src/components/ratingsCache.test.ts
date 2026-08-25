@@ -54,6 +54,35 @@ describe('ratingsCache', () => {
     await expect(tryGetRating(request)).resolves.toEqual(rating)
   })
 
+  // A product is looked up from its list card and from its product page, and
+  // the two must land on the same wine. Only the product page reliably knows
+  // the producer, so its match may overwrite the card's — never the reverse.
+  it('refetches when a producer is known and the cached match had none', async () => {
+    await saveRating(request, rating)
+
+    await expect(
+      tryGetRating({ ...request, producer: 'Felix Solis' })
+    ).resolves.toBeNull()
+    // Left in place: the refetch that follows overwrites it.
+    await expect(storedKeys()).resolves.toEqual([
+      'ratings:123-wine',
+      'ratings:123-wine$'
+    ])
+  })
+
+  it('serves a producer-confirmed match to a lookup that knows no producer', async () => {
+    await saveRating({ ...request, producer: 'Felix Solis' }, rating)
+
+    await expect(tryGetRating(request)).resolves.toEqual(rating)
+  })
+
+  it('serves the entry when the producer is the one it was matched with', async () => {
+    const withProducer = { ...request, producer: 'Felix Solis' }
+    await saveRating(withProducer, rating)
+
+    await expect(tryGetRating(withProducer)).resolves.toEqual(rating)
+  })
+
   it('evicts an expired entry on read', async () => {
     await saveRating(request, rating)
     await fakeBrowser.storage.local.set({

@@ -110,7 +110,11 @@ four `sync:`-scoped storage items in `settings.ts` (`featuresEnabled`,
 contract used across the process boundary.
 
 **Caching** (`ratingsCache.ts`) uses `@wxt-dev/storage` with `local:` keys and
-per-item metadata timestamps; entries expire after 1 day. Reads evict their
+per-item metadata timestamps; entries expire after 1 day. A product's list
+card and its product page share one entry (the key is the product number, not
+the query), which is what keeps the two views on the same wine — the metadata
+also records the producer the match was made with, so a page that knows the
+producer refetches over an entry a card wrote without one, never the reverse. Reads evict their
 own expired entry; `removeExpiredRatings` (run on background startup, throttled
 to once an hour because it reads every cached value) sweeps the rest — expired
 entries, and either half of a torn write — so cached label images can't

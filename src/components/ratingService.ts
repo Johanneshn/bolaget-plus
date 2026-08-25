@@ -122,6 +122,7 @@ export async function enqueueListFetch(
   // of trickling one badge per delay tick.
   const cached = await tryGetRating({
     includeImage: false,
+    producer,
     productId,
     productName,
     query: type
