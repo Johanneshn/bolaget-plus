@@ -76,6 +76,10 @@ external fetches are delegated to the background script.
    exclusion-list note in that file). `isCardBottle()` applies the same gate to
    list cards, reading the packaging from the `__NEXT_DATA__` payload when the
    card's product is in it and falling back to the card's own detail lines.
+   Note that a *list* page's payload holds no products at all — `/sortiment/`
+   ships CMS content and fetches its results client-side — so a card is in
+   practice always read from its own text (`getCardCountry`), while a product
+   page gets producer and country out of its embedded payload.
 3. `ratingService.fetchRating` checks the local cache first
    (`ratingsCache.ts`), otherwise sends a `RatingRequest` message to the
    background script and caches responses that are neither `NotFound` nor
@@ -89,11 +93,13 @@ external fetches are delegated to the background script.
 5. `api.ts` scores candidates with `string-similarity`. A Vivino match must
    additionally be confirmed by the producer (`queryContainsWinery`) or be an
    exact name hit on a distinctive title — see the comments in that file for
-   the regressions each rule guards. When Systembolaget's own page data names
-   the producer, `productUtils.getProducer` passes it along and a hit whose
-   winery *that* confirms wins outright (`bestFromProducer`): a title which is
-   nothing but a brand ("Mucho Mas") cannot otherwise be told apart from an
-   unrelated winery of the same name. Unconfirmed candidates return
+   the regressions each rule guards. Two facts Systembolaget states about the
+   product are weighed alongside the title (`ProductFacts`): a hit from another
+   **country** is dropped outright, and a hit whose winery the stated
+   **producer** confirms wins over the title-based rules (`bestFromProducer`) —
+   a title which is nothing but a brand ("Mucho Mas") cannot otherwise be told
+   apart from an unrelated winery of the same name. Which of the two is
+   readable differs per view; see `countries.ts` for the name folding. Unconfirmed candidates return
    `RatingResultStatus.Uncertain` with up to 3 ranked alternatives and a
    search link rather than a wrong rating; an empty Untappd result returns
    `NotFound`.
@@ -113,8 +119,10 @@ contract used across the process boundary.
 per-item metadata timestamps; entries expire after 1 day. A product's list
 card and its product page share one entry (the key is the product number, not
 the query), which is what keeps the two views on the same wine — the metadata
-also records the producer the match was made with, so a page that knows the
-producer refetches over an entry a card wrote without one, never the reverse. Reads evict their
+also records the facts the match was made with, so the better-informed view
+refetches over the other's entry — and a view that knows *less* never undoes
+it, which is what keeps two half-informed views from overwriting each other in
+turn. Reads evict their
 own expired entry; `removeExpiredRatings` (run on background startup, throttled
 to once an hour because it reads every cached value) sweeps the rest — expired
 entries, and either half of a torn write — so cached label images can't

@@ -626,11 +626,9 @@ test.describe('Vivino lookup misses (mocked fetch)', () => {
 
     // Systembolaget spells it without the accents Vivino uses, and adds the
     // company form — neither may cost the match.
-    const result = await fetchRatingFromVivino(
-      'Mucho Mas',
-      false,
-      'Felix Solis Avantis'
-    )
+    const result = await fetchRatingFromVivino('Mucho Mas', false, {
+      producer: 'Felix Solis Avantis'
+    })
 
     expect(result.status).toBe(RatingResultStatus.Found)
     expect(result.name).toBe('Félix Solís Mucho Más Tinto')
@@ -661,13 +659,55 @@ test.describe('Vivino lookup misses (mocked fetch)', () => {
         ])
       )
 
-    const result = await fetchRatingFromVivino(
-      'Mucho Mas Blanco',
-      false,
-      'Felix Solis Avantis'
-    )
+    const result = await fetchRatingFromVivino('Mucho Mas Blanco', false, {
+      producer: 'Felix Solis Avantis'
+    })
 
     expect(result.name).toBe('Félix Solís Mucho Más Blanco')
+  })
+
+  // The two views of one product read different things off the page: a list
+  // card can only see the country in its own text, a product page also gets
+  // the producer out of its embedded data. Neither may name a different wine
+  // than the other — so the card, knowing less, must not land on a wine the
+  // product page would reject.
+  test("a card that knows only the country does not pick another country's wine", async () => {
+    const hits = [
+      vivinoHit({
+        id: 5798850,
+        name: 'Mucho Mas Merlot',
+        region: { country: { code: 'cl', name: 'Chile' } },
+        statistics: { ratings_average: 3.3, ratings_count: 138 },
+        vintages: [{ id: 111, statistics: { ratings_count: 138 } }],
+        winery: { name: 'Mucho Mas' }
+      }),
+      vivinoHit({
+        id: 6266660,
+        name: 'Mucho Más Tinto',
+        region: { country: { code: 'es', name: 'Spain' } },
+        statistics: { ratings_average: 3.8, ratings_count: 15500 },
+        vintages: [{ id: 154917912, statistics: { ratings_count: 15500 } }],
+        winery: { name: 'Félix Solís' }
+      })
+    ]
+    globalThis.fetch = () => Promise.resolve(vivinoSearchResponse(hits, 240))
+
+    // What the card sees: Spain, and nothing else.
+    const card = await fetchRatingFromVivino('Mucho Mas', false, {
+      country: 'es'
+    })
+    // The Chilean namesake is out; the Spanish wine's own title cannot confirm
+    // it, so the card offers it rather than asserting it.
+    expect(card.status).toBe(RatingResultStatus.Uncertain)
+    expect(card.alternatives?.[0].name).toBe('Félix Solís Mucho Más Tinto')
+
+    // What the product page sees: the producer too, which settles it.
+    const page = await fetchRatingFromVivino('Mucho Mas', false, {
+      country: 'es',
+      producer: 'Felix Solis Avantis'
+    })
+    expect(page.status).toBe(RatingResultStatus.Found)
+    expect(page.name).toBe('Félix Solís Mucho Más Tinto')
   })
 
   test('returns no alternatives when the search has no hits', async () => {

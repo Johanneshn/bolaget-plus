@@ -2,15 +2,18 @@ import stringSimilarity from 'string-similarity'
 
 import {
   BeerResponse,
+  ProductFacts,
   RatingAlternative,
   RatingResponse,
   RatingResultStatus,
   UntappdHit,
   UntappdSearchConfig,
   UntappdSearchJSON,
+  VivinoCountry,
   VivinoHit,
   VivinoSearchJSON
 } from '@/@types/types'
+import { countryCode } from '@/components/countries'
 
 // Untappd's search page renders results client-side via Algolia, so the HTML
 // carries no beers — but it does carry the search-only credentials its own JS
@@ -160,6 +163,7 @@ const WINERY_COMPANY_WORDS = new Set([
 // of its own words the title never mentions, and the producer Vivino files it
 // under.
 type ScoredWine = RatingResponse & {
+  country?: string
   exactNameMatch: boolean
   imageUrl?: string
   similarityRate: number
@@ -302,7 +306,7 @@ export async function fetchRatingFromUntappd(
 export async function fetchRatingFromVivino(
   query: string,
   includeImage = true,
-  producer?: string,
+  facts: ProductFacts = {},
   fetchImage: (
     url: string | undefined
   ) => Promise<string | undefined> = fetchImageAsDataUrl
@@ -362,6 +366,7 @@ export async function fetchRatingFromVivino(
         )
 
         return {
+          country: hitCountry(hit),
           exactNameMatch:
             normalize(hit.name) === normalize(query) ||
             normalize(fullName) === normalize(query),
@@ -395,9 +400,20 @@ export async function fetchRatingFromVivino(
     // against "R Riesling Organic", a different producer's wine.
     const nameIsDistinctive =
       (data.nbHits ?? Infinity) <= MAX_HITS_FOR_EXACT_NAME_MATCH
+    // A wine made in another country is not this product, whatever its name
+    // says: an unrelated Chilean winery called "Mucho Mas" matches the title
+    // of a Spanish "Mucho Mas" perfectly. Both catalogues print the country,
+    // and a list card prints it even where nothing else about the product is
+    // readable. Hits whose country Vivino leaves out stay in — an unknown
+    // country is not a mismatch.
+    const candidates = facts.country
+      ? scored.filter(
+          (wine) => wine.country === undefined || wine.country === facts.country
+        )
+      : scored
     const bestMatch =
-      bestFromProducer(scored, producer) ??
-      scored.find(
+      bestFromProducer(candidates, facts.producer) ??
+      candidates.find(
         (wine) =>
           wine.similarityRate >= MIN_NAME_SIMILARITY &&
           (queryContainsWinery(query, wine.winery) ||
@@ -405,7 +421,12 @@ export async function fetchRatingFromVivino(
       )
 
     if (!bestMatch) {
-      const top = scored.slice(0, MAX_ALTERNATIVES)
+      // Suggest from the same country when there is anything there, but never
+      // show an empty card just because the country filter emptied the list.
+      const top = (candidates.length > 0 ? candidates : scored).slice(
+        0,
+        MAX_ALTERNATIVES
+      )
       if (includeImage) {
         await Promise.all(
           top.map(async (wine) => {
@@ -518,6 +539,17 @@ function distinctiveTokens(text: string): string[] {
     )
 }
 
+// Vivino files a wine's country under whichever of these the index build
+// happens to carry; the first one that resolves to a known country wins, and
+// nothing resolving means the hit simply has no country to check.
+function hitCountry(hit: VivinoHit): string | undefined {
+  return (
+    countryCode(readCountryValue(hit.region?.country)) ??
+    countryCode(hit.region?.country_code) ??
+    countryCode(readCountryValue(hit.country))
+  )
+}
+
 // Lowercases and folds diacritics and punctuation so cosmetic spelling
 // differences between the two catalogues don't break comparisons: Vivino
 // writes "Barbera d’Alba" and "Bobal - Syrah" where Systembolaget writes
@@ -600,6 +632,17 @@ function queryContainsWinery(
   return wineryTokens.every((wineryToken) =>
     containsToken(queryTokens, wineryToken)
   )
+}
+
+function readCountryValue(
+  value: undefined | VivinoCountry
+): string | undefined {
+  if (!value) {
+    return undefined
+  }
+  return typeof value === 'string'
+    ? value
+    : (value.name ?? value.code ?? undefined)
 }
 
 function similarity(a: string, b: string): number {

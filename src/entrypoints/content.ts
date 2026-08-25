@@ -82,12 +82,13 @@ async function handleListCard(card: Element) {
   const spinner = domUtils.injectCardSpinner(card, productId)
   if (!spinner) return
 
-  const rating = await enqueueListFetch(
-    productId,
-    name,
-    productType,
-    productUtils.getProducer(productId) ?? undefined
-  )
+  const rating = await enqueueListFetch(productId, name, productType, {
+    // A card is on its own: the list page's embedded data holds no products,
+    // so the card's own text is all there is — and the country is the part of
+    // it the product page can be relied on to agree with.
+    country: productUtils.getCardCountry(card, productId) ?? undefined,
+    producer: productUtils.getProducer(productId) ?? undefined
+  })
   domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
 }
 
@@ -142,7 +143,10 @@ async function tryInsertOnProductPage() {
       productName,
       productType,
       true,
-      productUtils.getProducer(productId) ?? undefined
+      {
+        country: productUtils.getProductCountry(productId) ?? undefined,
+        producer: productUtils.getProducer(productId) ?? undefined
+      }
     )
     if (activeRequest !== request) return
     handleRating(productType, rating)

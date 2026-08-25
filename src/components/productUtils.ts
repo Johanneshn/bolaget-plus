@@ -1,4 +1,5 @@
 import { ProductType } from '@/@types/types'
+import { countryCodeFromName } from '@/components/countries'
 
 // The category line shown above the product name on list cards
 // ("Vitt vin, Friskt & fruktigt", "Öl, Ljus lager, …") — it must not leak
@@ -12,8 +13,42 @@ const VINTAGE_ONLY = /^(19|20)\d{2}$/
 
 // What the embedded page data tells us about a product beyond its name.
 interface PageProduct {
+  country?: string
   packaging?: string
   producer?: string
+}
+
+// A list card's country, as an ISO alpha-2 code. The embedded page data does
+// not cover list pages at all — /sortiment/ ships CMS content only and fetches
+// its products client-side — so the card's own text is the one place a card
+// can be asked. Read by matching known country names rather than by position:
+// the detail lines have no fixed order, and a line that names no country we
+// know of simply yields nothing.
+export function getCardCountry(
+  card: Element,
+  productId: string
+): null | string {
+  const lines = getCardLines(card)
+  const nrIndex = findProductNumberLine(lines, productId)
+  // The two lines above the product number are the name and subtitle — prose,
+  // where a country word would be part of a wine's name, not its origin.
+  const searchable =
+    nrIndex < 0
+      ? lines
+      : [
+          ...lines.slice(0, Math.max(0, nrIndex - 2)),
+          ...lines.slice(nrIndex + 1)
+        ]
+
+  for (const line of searchable) {
+    for (const segment of line.split(/[,·•|]/)) {
+      const code = countryCodeFromName(segment)
+      if (code) {
+        return code
+      }
+    }
+  }
+  return null
 }
 
 export function getCardName(card: Element): null | string {
@@ -55,6 +90,11 @@ export function getCardProductType(card: Element): ProductType {
 // the lookup then falls back to judging the title alone, as it always has.
 export function getProducer(productId: string): null | string {
   return getProductFromPageData(productId)?.producer ?? null
+}
+
+// The product page's country, as an ISO alpha-2 code.
+export function getProductCountry(productId: string): null | string {
+  return countryCodeFromName(getProductFromPageData(productId)?.country) ?? null
 }
 
 export function getProductId(): null | string {
@@ -194,19 +234,22 @@ function buildProductMap(raw: string): Map<string, PageProduct> {
     }
 
     const product = node as {
+      country?: unknown
       packagingLevel1?: unknown
       producerName?: unknown
       productNumber?: unknown
     }
     if (typeof product.productNumber === 'string') {
+      const country = readString(product.country)
       const packaging = readString(product.packagingLevel1)?.toLowerCase()
       const producer = readString(product.producerName)
       // The payload nests the same product under several keys, and not every
       // copy is complete — keep the fields already found rather than letting a
       // sparser copy blank them.
       const known = map.get(product.productNumber)
-      if (packaging ?? producer) {
+      if (country ?? packaging ?? producer) {
         map.set(product.productNumber, {
+          country: country ?? known?.country,
           packaging: packaging ?? known?.packaging,
           producer: producer ?? known?.producer
         })
@@ -293,10 +336,12 @@ function getPackagingDescriptor(main: HTMLElement): null | string {
 
 // Systembolaget embeds the data of the initially loaded page in Next.js'
 // __NEXT_DATA__ script; "packagingLevel1" is the packaging name ("Flaska",
-// "Box", …) and "producerName" the producer. A product page carries one
-// product, a list page the first page of results, so index whatever is there
-// and only trust an entry that matches the product being asked about — SPA
-// navigations don't refresh the script.
+// "Box", …), "producerName" the producer and "country" the origin. A product
+// page carries its own product; a list page carries none at all (/sortiment/
+// ships CMS content and fetches its products client-side), which is why a card
+// falls back to its own text for everything. Index whatever is there and only
+// trust an entry that matches the product being asked about — SPA navigations
+// don't refresh the script.
 let pageDataCache: null | { map: Map<string, PageProduct>; raw: string } = null
 
 function getPackagingFromPageData(productId: string): null | string {
