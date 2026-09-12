@@ -10,6 +10,35 @@ const GATE_TIMEOUT = 10_000
 export const RATING_TIMEOUT = 30_000
 
 /**
+ * Fails the test if Systembolaget answered with its geo-block page instead of
+ * the page that was asked for.
+ *
+ * Since September 2026 the site 302-redirects every request from a US
+ * connection to a "Begränsad åtkomst" page on Azure Front Door — and
+ * GitHub-hosted runners are in the US. Without this check the content script
+ * never sees an `h1`, every test waits RATING_TIMEOUT for a rating that can't
+ * render, and the run reports "Target page, context or browser has been
+ * closed", which reads like a crash. Failing here instead names the real
+ * cause in a second, and keeps a test that asserts the *absence* of a rating
+ * from passing vacuously against a page the extension never ran on.
+ */
+export function assertNotGeoBlocked(page: Page, requested: string): void {
+  const landed = new URL(page.url())
+  const blocked =
+    landed.hostname.endsWith('.azurefd.net') ||
+    landed.pathname.includes('blocked')
+  if (!blocked) return
+
+  throw new Error(
+    `Systembolaget redirected ${requested} to its geo-block page ` +
+      `(${landed.href}). The site is refusing this runner's region — ` +
+      `usually a US-hosted CI runner — so the smoke tests cannot run from ` +
+      `here. This says nothing about the extension; run them from a ` +
+      `non-US network.`
+  )
+}
+
+/**
  * Clicks away the age gate and the cookie banner.
  *
  * Neither is guaranteed to be there: the profile may already have consented,
@@ -57,6 +86,8 @@ export async function dismissGates(page: Page): Promise<void> {
  */
 export async function openPage(page: Page, url: string): Promise<void> {
   await page.goto(url)
+  assertNotGeoBlocked(page, url)
   await dismissGates(page)
   await page.reload()
+  assertNotGeoBlocked(page, url)
 }
