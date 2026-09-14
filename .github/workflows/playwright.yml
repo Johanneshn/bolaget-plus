@@ -12,10 +12,11 @@ name: Nightly Smoke Tests
 # Actions tab.
 #
 # Note: Systembolaget geo-blocks US connections, and GitHub-hosted runners
-# are in the US. While that block is in place every smoke test fails fast
-# with a "redirected ... to its geo-block page" error (see
-# e2e/systembolaget.ts); the only ways around it are a self-hosted runner
-# outside the US or waiting for the block to be lifted.
+# are in the US. While that block is in place every smoke test is skipped
+# with a "redirected ... to its geo-block page" reason (see
+# e2e/systembolaget.ts), so the run goes green without having driven the
+# site at all — check the skip count in the report. The only ways around it
+# are a self-hosted runner outside the US or waiting for the block to lift.
 on:
   schedule:
     - cron: '0 1 * * *'
