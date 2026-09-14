@@ -22,6 +22,13 @@ export default defineConfig({
     {
       name: 'smoke',
       testMatch: /end-to-end\.spec\.ts/,
+      // A smoke test loads the live site, clears its gates, reloads, and
+      // then waits up to RATING_TIMEOUT for a rating (twice, for the tests
+      // that also wait for the spinner). Playwright's default 30 s test
+      // timeout is shorter than that single rating wait, so it always fired
+      // first and reported "browser has been closed" instead of the selector
+      // that was actually being waited for.
+      timeout: 120_000,
       use: { ...devices['Desktop Chrome'] }
     },
     {

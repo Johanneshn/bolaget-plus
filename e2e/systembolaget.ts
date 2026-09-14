@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test'
+import { type Locator, type Page, test } from '@playwright/test'
 
 // How long to wait for a gate to show up on a freshly loaded page. Generous,
 // because these tests hit the live site over whatever the runner's network
@@ -57,6 +57,48 @@ export async function dismissGates(page: Page): Promise<void> {
  */
 export async function openPage(page: Page, url: string): Promise<void> {
   await page.goto(url)
+  skipIfGeoBlocked(page, url)
   await dismissGates(page)
   await page.reload()
+  skipIfGeoBlocked(page, url)
+}
+
+/**
+ * Skips the test if Systembolaget answered with its geo-block page instead of
+ * the page that was asked for.
+ *
+ * Since September 2026 the site 302-redirects every request from a US
+ * connection to a "Begränsad åtkomst" page on Azure Front Door — and
+ * GitHub-hosted runners are in the US. Without this check the content script
+ * never sees an `h1`, every test waits RATING_TIMEOUT for a rating that can't
+ * render, and the run reports "Target page, context or browser has been
+ * closed", which reads like a crash and took eight minutes of retries to
+ * produce.
+ *
+ * The test is skipped rather than failed because the block says nothing about
+ * the extension: the nightly run exists to catch Systembolaget markup changes
+ * and matching regressions, and a red run every night for a condition this
+ * repository cannot fix drowns out the runs that do mean something. The skip
+ * reason names the block page, so the Playwright report still shows that the
+ * smoke tests did not actually run — and a test that asserts the *absence* of
+ * a rating can no longer pass vacuously against a page the extension never
+ * ran on.
+ */
+export function skipIfGeoBlocked(page: Page, requested: string): void {
+  const landed = new URL(page.url())
+  const blocked =
+    landed.hostname.endsWith('.azurefd.net') ||
+    landed.pathname.includes('blocked')
+  if (!blocked) return
+
+  test
+    .info()
+    .skip(
+      true,
+      `Systembolaget redirected ${requested} to its geo-block page ` +
+        `(${landed.href}). The site is refusing this runner's region — ` +
+        `usually a US-hosted CI runner — so the smoke tests cannot run from ` +
+        `here. This says nothing about the extension; run them from a ` +
+        `non-US network.`
+    )
 }

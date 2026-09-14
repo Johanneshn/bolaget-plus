@@ -163,7 +163,11 @@ The Playwright tests in `e2e/` are split into three projects
   CI). `fixtures.ts` provides the `extensionId` fixture; `systembolaget.ts`
   provides `openPage`, which dismisses the age gate ("Jag har fyllt 20 år") and
   cookie banner ("Acceptera alla kakor") tolerantly — a gate that never appears
-  is not an error, so a banner change fails no test on its own.
+  is not an error, so a banner change fails no test on its own. It also skips
+  the test, with the reason in the report, when Systembolaget answers with its
+  US geo-block page instead of the product page (GitHub-hosted runners are in
+  the US), so a green nightly run with every smoke test skipped means the site
+  was never driven, not that it passed.
 - `live-api` (`api-live.spec.ts`) — real queries against Vivino and Untappd,
   including reading Untappd's search credentials out of its live markup.
 
