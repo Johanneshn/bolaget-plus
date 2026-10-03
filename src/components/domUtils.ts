@@ -15,7 +15,7 @@ const STYLE_ID = 'bolaget-plus-css'
 
 // The rating section borrows Systembolaget's own design tokens (with
 // fallbacks for when a redesign renames them) so it reads as part of the
-// product page: a flat block between hairlines, labelled like the page's own
+// product page: a softly tinted block labelled like the page's own
 // "FYLLIGHET"-style headings, rather than a branded widget on top of it.
 const FG = 'var(--foreground, #262626)'
 const MUTED_FG = 'var(--muted-foreground, #262626b3)'
@@ -25,9 +25,9 @@ const MUTED_BG = 'var(--muted, #2626260d)'
 const STYLES = `
   #${RATING_CONTAINER_ID} {
     margin: 16px 0;
-    padding: 12px 0;
-    border-top: 1px solid ${BORDER};
-    border-bottom: 1px solid ${BORDER};
+    padding: 14px 16px;
+    border-radius: 8px;
+    background: ${MUTED_BG};
     font-family: inherit;
     font-size: 14px;
     color: ${FG};
@@ -47,7 +47,7 @@ const STYLES = `
     gap: 8px;
   }
   #${RATING_CONTAINER_ID} .bp-score {
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 700;
     line-height: 1;
   }
