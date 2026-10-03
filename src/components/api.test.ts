@@ -433,6 +433,23 @@ describe('fetchRatingFromUntappd', () => {
     expect((result as BeerResponse).brewery).toBe('Pabst Brewing Company')
   })
 
+  // Issue #85: a collaboration title ("Hop Notch x Fat Lizard Nordic Unity")
+  // matches nothing as a whole; Algolia is asked to shed leading words then.
+  it('asks Algolia to drop leading words when the full title finds nothing', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ hits: [] }))
+
+    await fetchRatingFromUntappd(
+      'Hop Notch x Fat Lizard Nordic Unity',
+      searchConfig
+    )
+
+    const init = fetchMock.mock.calls[0][1]
+    const body = JSON.parse(init?.body as string) as { params: string }
+    expect(new URLSearchParams(body.params).get('removeWordsIfNoResults')).toBe(
+      'firstWords'
+    )
+  })
+
   it('normalizes a missing score to 0 for the no-score rendering', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
