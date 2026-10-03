@@ -19,6 +19,7 @@ import {
   ciderFeatureEnabled,
   wineFeatureEnabled
 } from '@/components/settings'
+import { t } from '@/components/strings'
 
 export default defineContentScript({
   main() {
@@ -133,7 +134,7 @@ function handleRating(
       domUtils.setUncertain(productType, rating, onChoose)
       return
     default:
-      domUtils.setMessage(i18n.t('noMatch'))
+      domUtils.setMessage(t('noMatch'))
       return
   }
 }
@@ -151,7 +152,7 @@ async function tryInsertOnProductPage(force = false) {
 
   domUtils.injectRatingContainer()
   if (productType == ProductType.Wine && !productUtils.isBottle()) {
-    domUtils.setMessage(i18n.t('notOnBottle'))
+    domUtils.setMessage(t('notOnBottle'))
     return
   }
 
@@ -184,7 +185,7 @@ async function tryInsertOnProductPage(force = false) {
     handleRating(productId, productType, rating)
   } catch {
     if (activeRequest === request) {
-      domUtils.setMessage(i18n.t('noMatch'))
+      domUtils.setMessage(t('noMatch'))
     }
   } finally {
     if (activeRequest === request) {

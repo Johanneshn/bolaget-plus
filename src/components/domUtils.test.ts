@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fakeBrowser } from 'wxt/testing'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
   ProductType,
@@ -9,6 +8,7 @@ import {
 } from '@/@types/types'
 import {
   injectCardSpinner,
+  ratingTier,
   replaceCardSpinner,
   setRating,
   setUncertain
@@ -41,15 +41,30 @@ function renderCard(productId: string): Element {
 
 beforeEach(() => {
   document.body.innerHTML = ''
-  // fakeBrowser has no i18n; the message key stands in for the text.
-  vi.spyOn(fakeBrowser.i18n, 'getMessage').mockImplementation(
-    (key: string) => key
-  )
 })
 
 describe('replaceCardSpinner', () => {
   it('shows the score', () => {
     expect(badge(renderCard('203701'), 3.8, 7606)).toBe('3.8')
+  })
+
+  it('tints the badge by tier and labels it for screen readers', () => {
+    const card = renderCard('203701')
+    badge(card, 4.1, 812)
+
+    const element = card.querySelector<HTMLElement>('.bp-card-rating')
+    expect(element?.dataset.tier).toBe('high')
+    expect(element?.getAttribute('aria-label')).toBe('4.1 av 5, 812 röster')
+  })
+
+  it.each([
+    [4, 'high'],
+    [3.9, 'mid'],
+    [3.5, 'mid'],
+    [3.4, 'low'],
+    [0, 'low']
+  ])('puts %s in the %s tier', (score, tier) => {
+    expect(ratingTier(score)).toBe(tier)
   })
 
   it('shows a score of 0 as not rated yet, not as zero', () => {
@@ -97,7 +112,7 @@ describe('setRating', () => {
     setRating(ProductType.Wine, rating, rating.link, '2024')
 
     const line = document.querySelector<HTMLAnchorElement>('.bp-vintage')
-    expect(line?.textContent).toBe('vintage 2024: 3.9 (846 votes)')
+    expect(line?.textContent).toBe('Årgång 2024: 3.9 (846 röster)')
     expect(line?.href).toBe('https://www.vivino.com/wines/24')
   })
 
@@ -106,7 +121,7 @@ describe('setRating', () => {
     setRating(ProductType.Wine, rating, rating.link, '2025')
 
     expect(document.querySelector('.bp-vintage')?.textContent).toBe(
-      'vintage 2025: noRatingYet'
+      'Årgång 2025: Inte tillräckligt många betyg än'
     )
   })
 
@@ -173,7 +188,7 @@ describe('correcting a match', () => {
     )
 
     expect(document.querySelector('.bp-correction')?.textContent).toBe(
-      'yourPick · undo'
+      'Ditt val · Ångra'
     )
     document.querySelector<HTMLButtonElement>('.bp-correction button')?.click()
     expect(undone).toBe(true)
