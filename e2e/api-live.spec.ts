@@ -116,6 +116,18 @@ test.describe('API Integration Tests', () => {
     expect(result.link).toContain('untappd.com')
   })
 
+  // Issue #85: a collaboration's Systembolaget title names both breweries,
+  // while Untappd indexes the beer under one ("Nordic Unity APA", Hop Notch).
+  test('fetchRatingFromUntappd finds a collaboration titled with both breweries', async () => {
+    const result = await fetchRatingFromUntappd(
+      'Hop Notch x Fat Lizard Nordic Unity',
+      liveConfig
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Found)
+    expect(result.link).toContain('/6252924')
+  })
+
   test('fetchRatingFromUntappd returns data for a cider query', async () => {
     const result = await fetchRatingFromUntappd('Rekorderlig Päron', liveConfig)
 

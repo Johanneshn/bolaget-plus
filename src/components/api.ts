@@ -231,7 +231,14 @@ export async function fetchRatingFromUntappd(
       body: JSON.stringify({
         params: new URLSearchParams({
           hitsPerPage: '5',
-          query: productName
+          query: productName,
+          // Collaborations are titled with every brewery ("Hop Notch x Fat
+          // Lizard Nordic Unity") but indexed under one, so the full title
+          // matches nothing. When — and only when — a query has no hits,
+          // Algolia drops words from the front until one does, which sheds
+          // the brewery names before the beer's own. Whatever that finds still
+          // has to pass the similarity check below.
+          removeWordsIfNoResults: 'firstWords'
         }).toString()
       }),
       headers: {
