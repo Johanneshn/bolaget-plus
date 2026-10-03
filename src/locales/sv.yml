@@ -8,7 +8,6 @@ linkToUntappd: Länk till Untappd
 linkToVivino: Länk till Vivino
 loading: Laddar...
 markTasted: Markera som provad
-minRating: Lägsta betyg
 noMatch: Tyvärr, vi kunde inte hitta något betyg för denna produkt.
 noRatingYet: Inte tillräckligt många betyg än
 notOnBottle: Vinet är inte på flaska
@@ -16,9 +15,9 @@ of: av
 rating: Betyg
 searchAtUntappd: Sök hos Untappd
 searchAtVivino: Sök hos Vivino
-show: Visa
-showAll: Alla
-sortByRating: Sortera på betyg
+sort: Sortera
+sortRating: Betyg
+sortValue: Prisvärt
 tasted: Provad
 uncertainMatch: Kunde inte hitta en exakt matchning, du kan själv söka via länken nedan.
 undo: Ångra

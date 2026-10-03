@@ -10,6 +10,10 @@ const CARD_SELECTOR = '[data-slot="product-tile"]'
 const CARD_TITLE_SELECTOR = '[data-slot="product-summary-title"]'
 const CARD_SUBTITLE_SELECTOR = '[data-slot="product-summary-subtitle"]'
 const CARD_COUNTRY_SELECTOR = '[data-slot="product-summary-country"]'
+const CARD_METADATA_SELECTOR = '[data-slot="product-summary-metadata"]'
+// The visible price ("249:-"); the screen-reader twin says "249 kronor".
+const CARD_PRICE_SELECTOR =
+  '[data-slot="product-summary-price"] [aria-hidden="true"]'
 
 // The last segment of a card link's accessible label: "750 ml", "3 l".
 const VOLUME_SEGMENT = /^\d[\d\s,.]*(cl|l|ml)$/i
@@ -56,6 +60,30 @@ export function getCardName(card: Element): null | string {
   const subtitle =
     card.querySelector(CARD_SUBTITLE_SELECTOR)?.textContent.trim() ?? ''
   return buildSearchName(name, subtitle) || null
+}
+
+// The card's price per litre, from its price ("249:-", "129:90") and the
+// volume opening its details line ("750 ml · 13 % vol. · Nr …"). Null when
+// either is missing, so a card that cannot be compared is left out of a value
+// ranking rather than ranked on a guess.
+export function getCardPricePerLitre(card: Element): null | number {
+  const priceText =
+    card.querySelector(CARD_PRICE_SELECTOR)?.textContent.replace(/\s/g, '') ??
+    ''
+  const price = /(\d+)(?::(\d{2}))?/.exec(priceText)
+  const volume = /(\d+(?:[.,]\d+)?)\s*(ml|cl|l)\b/i.exec(
+    card.querySelector(CARD_METADATA_SELECTOR)?.textContent ?? ''
+  )
+  if (!price || !volume) return null
+
+  // The öre group is optional, so it can be missing despite its string type.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const kronor = Number(price[1]) + Number(price[2] ?? 0) / 100
+  const amount = Number(volume[1].replace(',', '.'))
+  const unit = volume[2].toLowerCase()
+  const litres =
+    unit === 'ml' ? amount / 1000 : unit === 'cl' ? amount / 100 : amount
+  return kronor > 0 && litres > 0 ? kronor / litres : null
 }
 
 export function getCardProductId(card: Element): null | string {

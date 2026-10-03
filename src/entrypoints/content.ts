@@ -137,8 +137,7 @@ async function showTastedState(productId: string, untappdLink?: null | string) {
 // so it carries over to the next page of results.
 let listView: domUtils.ListView = {
   hideTasted: false,
-  minRating: 0,
-  sortByRating: false
+  sortBy: 'none'
 }
 
 function addListControls(card: Element) {
@@ -150,7 +149,7 @@ function addListControls(card: Element) {
     domUtils.applyListView(list, view)
     // Cards are only looked up once scrolled into view; sorting or filtering
     // needs them all. The fetch queue paces the lookups as usual.
-    if (view.sortByRating || view.minRating > 0 || view.hideTasted) {
+    if (view.sortBy !== 'none' || view.hideTasted) {
       for (const link of list.querySelectorAll(
         productUtils.CARD_LINK_SELECTOR
       )) {

@@ -13,7 +13,8 @@ import {
   markCardTasted,
   replaceCardSpinner,
   setRating,
-  setUncertain
+  setUncertain,
+  valueScores
 } from '@/components/domUtils'
 
 function badge(card: Element, rating: number, votes: number): string {
@@ -217,14 +218,23 @@ describe('correcting a match', () => {
   })
 })
 
-describe('sorting and filtering a result list', () => {
-  function renderList(ratings: (null | number)[]): HTMLUListElement {
-    document.body.innerHTML = `<ul>${ratings
-      .map(
-        (rating, index) =>
-          `<li id="item-${index.toString()}"><div data-slot="product-tile"${
-            rating === null ? '' : ` data-bp-rating="${rating.toString()}"`
-          }></div></li>`
+describe('sorting a result list', () => {
+  function renderList(
+    cards: (null | { price?: string; rating: null | number; volume?: string })[]
+  ): HTMLUListElement {
+    document.body.innerHTML = `<ul>${cards
+      .map((card, index) =>
+        card === null
+          ? `<li id="item-${index.toString()}"><aside>Dryck och mat</aside></li>`
+          : `<li id="item-${index.toString()}"><div data-slot="product-tile"${
+              card.rating === null
+                ? ''
+                : ` data-bp-rating="${card.rating.toString()}"`
+            }><div data-slot="product-summary-metadata">${
+              card.volume ?? '750 ml'
+            } · 13 % vol.</div><div data-slot="product-summary-price"><p aria-hidden="true">${
+              card.price ?? '149:-'
+            }</p></div></div></li>`
       )
       .join('')}</ul>`
     const list = document.querySelector('ul')
@@ -238,70 +248,87 @@ describe('sorting and filtering a result list', () => {
     return element
   }
 
-  it('hides rated cards below the minimum but never unrated ones', () => {
-    const list = renderList([4.2, 3.4, null, 3.6])
-    applyListView(list, {
-      hideTasted: false,
-      minRating: 3.5,
-      sortByRating: false
-    })
-
-    expect(item(0).style.display).toBe('')
-    expect(item(1).style.display).toBe('none')
-    expect(item(2).style.display).toBe('')
-    expect(item(3).style.display).toBe('')
-  })
+  const order = (index: number) => Number(item(index).style.order)
 
   it('orders rated cards best first and leaves unrated ones after them', () => {
-    const list = renderList([3.6, null, 4.2])
-    applyListView(list, { hideTasted: false, minRating: 0, sortByRating: true })
+    const list = renderList([
+      { rating: 3.6 },
+      { rating: null },
+      { rating: 4.2 }
+    ])
+    applyListView(list, { hideTasted: false, sortBy: 'rating' })
 
-    expect(Number(item(2).style.order)).toBeLessThan(
-      Number(item(0).style.order)
-    )
+    expect(order(2)).toBeLessThan(order(0))
+    expect(order(0)).toBeLessThan(0)
     expect(item(1).style.order).toBe('')
   })
 
-  it('hands the list back unchanged when both are turned off', () => {
-    const list = renderList([3.4, 4.2])
-    applyListView(list, { hideTasted: false, minRating: 4, sortByRating: true })
-    applyListView(list, {
-      hideTasted: false,
-      minRating: 0,
-      sortByRating: false
-    })
+  it('ranks by value: rating above what is usual at the price', () => {
+    // A 4,0 at 99 kr outranks a 4,2 at 399 kr once the others show that
+    // ratings rise with price.
+    const list = renderList([
+      { price: '399:-', rating: 4.2 },
+      { price: '99:-', rating: 4.0 },
+      { price: '149:-', rating: 3.6 },
+      { price: '249:-', rating: 3.9 },
+      { price: '89:-', rating: 3.4 },
+      { price: '199:-', rating: 3.8 }
+    ])
+    applyListView(list, { hideTasted: false, sortBy: 'value' })
 
-    expect(item(0).hasAttribute('style')).toBe(false)
-    expect(item(1).hasAttribute('style')).toBe(false)
+    expect(order(1)).toBeLessThan(order(0))
   })
 
-  it('reports the chosen minimum and sort from its controls', () => {
-    const list = renderList([4.2])
+  it('puts editorial segments last and packs the grid while sorted', () => {
+    const list = renderList([{ rating: 3.6 }, null, { rating: 4.2 }])
+    applyListView(list, { hideTasted: false, sortBy: 'rating' })
+
+    expect(order(1)).toBeGreaterThan(order(0))
+    expect(list.style.gridAutoFlow).toBe('dense')
+  })
+
+  it('hands the list back unchanged when everything is turned off', () => {
+    const list = renderList([{ rating: 3.4 }, null, { rating: 4.2 }])
+    applyListView(list, { hideTasted: true, sortBy: 'value' })
+    applyListView(list, { hideTasted: false, sortBy: 'none' })
+
+    for (const index of [0, 1, 2]) {
+      expect(item(index).hasAttribute('style')).toBe(false)
+    }
+    expect(list.hasAttribute('style')).toBe(false)
+  })
+
+  it('reports the chosen sort and tasted filter from its controls', () => {
+    const list = renderList([{ rating: 4.2 }])
     const changes: unknown[] = []
-    ensureListControls(
-      list,
-      { hideTasted: false, minRating: 0, sortByRating: false },
-      (view) => changes.push(view)
+    ensureListControls(list, { hideTasted: false, sortBy: 'none' }, (view) =>
+      changes.push(view)
     )
 
     const buttons = [
       ...document.querySelectorAll<HTMLButtonElement>('.bp-sort button')
     ]
     expect(buttons.map((button) => button.textContent)).toEqual([
-      'Alla',
-      '3,5+',
-      '4,0+',
       'Dölj provade',
-      'Sortera på betyg'
+      'Betyg',
+      'Prisvärt'
     ])
+    buttons[0].click()
     buttons[2].click()
-    buttons[3].click()
-    buttons[4].click()
     expect(changes).toEqual([
-      { hideTasted: false, minRating: 4, sortByRating: false },
-      { hideTasted: true, minRating: 0, sortByRating: false },
-      { hideTasted: false, minRating: 0, sortByRating: true }
+      { hideTasted: true, sortBy: 'none' },
+      { hideTasted: false, sortBy: 'value' }
     ])
+  })
+})
+
+describe('valueScores', () => {
+  it('falls back to rating per log price with too few cards to fit a line', () => {
+    const [cheap, dear] = valueScores([
+      { pricePerLitre: 120, rating: 3.8 },
+      { pricePerLitre: 600, rating: 3.9 }
+    ])
+    expect(cheap).toBeGreaterThan(dear)
   })
 })
 
@@ -313,7 +340,7 @@ describe('tasted products', () => {
     </ul>`
     const list = document.querySelector('ul')
     if (!list) throw new Error('list not rendered')
-    applyListView(list, { hideTasted: true, minRating: 0, sortByRating: false })
+    applyListView(list, { hideTasted: true, sortBy: 'none' })
 
     expect(document.getElementById('a')?.style.display).toBe('none')
     expect(document.getElementById('b')?.style.display).toBe('')

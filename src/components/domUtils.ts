@@ -7,7 +7,10 @@ import {
   RatingResponse,
   RatingResultStatus
 } from '@/@types/types'
-import { getCardProductId } from '@/components/productUtils'
+import {
+  getCardPricePerLitre,
+  getCardProductId
+} from '@/components/productUtils'
 import { t } from '@/components/strings'
 
 const RATING_CONTAINER_ID = 'rating-container'
@@ -640,6 +643,11 @@ function createAlternativeList(
   return list
 }
 
+// Half stars and caps fill through a gradient referenced by id. The id must be
+// unique per icon: url(#id) resolves to the first element with that id in the
+// page, and when that one sits in a hidden card ("Dölj provade") the gradient
+// stops painting for every other icon that shares it.
+let gradientCounter = 0
 // A check mark, drawn as SVG (one stroke, the text's colour) rather than a
 // glyph, built node by node so no markup string is involved.
 function createCheckIcon(): SVGSVGElement {
@@ -763,6 +771,11 @@ function createVintageLine(
   return line
 }
 
+function nextGradientId(): string {
+  gradientCounter++
+  return gradientCounter.toString()
+}
+
 // What a screen reader should say for a score shown as stars: "3.9 av 5, 412
 // röster" rather than five unlabelled images and a bare number.
 function ratingLabel(rating: { rating: number; votes: number }): string {
@@ -814,7 +827,7 @@ function generateCapSvg(rating: number): string {
     if (rating >= i + 1) {
       capsHtml += capSvg(yellowColor)
     } else if (rating >= i + 0.5) {
-      const gradientId = `bp-half-cap-${i.toString()}`
+      const gradientId = `bp-half-cap-${nextGradientId()}`
       capsHtml += `
       <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="${heightAndWidth}" height="${heightAndWidth}" viewBox="0 0 50 50" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
         <defs>
@@ -887,42 +900,73 @@ const CARD_RATING_CLASS = 'bp-card-rating'
 const CARD_PRODUCT_ATTRIBUTE = 'data-bp-product'
 const CARD_INJECTED_SELECTOR = `.${CARD_RATING_CLASS}, .bp-card-spinner-inline`
 
-// How the user wants a result list shown: sorted by rating, and/or with
-// rated cards below a minimum hidden.
+// "rating": best first. "value": most rating for the money first — see
+// valueScores.
+export type ListSort = 'none' | 'rating' | 'value'
+
+// How the user wants a result list shown: sorted by rating or by value, and
+// with tasted products hidden.
 export interface ListView {
   hideTasted: boolean
-  minRating: number
-  sortByRating: boolean
+  sortBy: ListSort
 }
-
-// The minimum-rating choices offered; 0 shows every card.
-const MIN_RATING_OPTIONS = [0, 3.5, 4] as const
 
 // Applies a ListView to a result list. Unrated cards — not looked up yet, not
 // on Vivino or Untappd, boxes, too few ratings — are never hidden (no rating is
 // not a bad rating) and, when sorting, keep their place after the rated ones.
 export function applyListView(list: Element, view: ListView): void {
-  for (const item of list.children) {
+  const items = [...list.children].map((item) => {
     const tile = item.querySelector<HTMLElement>('[data-slot="product-tile"]')
-    const rating = Number(tile?.dataset.bpRating ?? 0)
-    const element = item as HTMLElement
-    setStyle(
-      element,
-      'order',
-      view.sortByRating && rating > 0 ? String(-Math.round(rating * 100)) : null
+    return {
+      element: item as HTMLElement,
+      pricePerLitre: tile ? getCardPricePerLitre(tile) : null,
+      rating: Number(tile?.dataset.bpRating ?? 0),
+      tile
+    }
+  })
+
+  // The rank each sortable card gets; unranked cards keep the site's order
+  // after them.
+  const rank = new Map<HTMLElement, number>()
+  if (view.sortBy === 'rating') {
+    for (const item of items) {
+      if (item.rating > 0) rank.set(item.element, -item.rating)
+    }
+  } else if (view.sortBy === 'value') {
+    const priced = items.flatMap((item) =>
+      item.rating > 0 && item.pricePerLitre !== null
+        ? [{ ...item, pricePerLitre: item.pricePerLitre }]
+        : []
     )
-    const hidden =
-      (rating > 0 && rating < view.minRating) ||
-      (view.hideTasted && tile?.dataset.bpTasted === 'true')
+    valueScores(priced).forEach((score, i) => {
+      rank.set(priced[i].element, -score)
+    })
+  }
+  const ordered = [...rank.entries()].sort((a, b) => a[1] - b[1])
+  const position = new Map(
+    ordered.map(([element], index) => [element, index - ordered.length])
+  )
+
+  // Systembolaget mixes double-width editorial segments ("Dryck och mat")
+  // into the grid. Once cards are reordered or hidden, such a segment can
+  // leave an empty cell beside it; while a view is active, segments go last
+  // and the grid packs densely, so no holes open up.
+  const active = view.sortBy !== 'none' || view.hideTasted
+  setStyle(list as HTMLElement, 'grid-auto-flow', active ? 'dense' : null)
+
+  for (const { element, tile } of items) {
+    const order = tile ? position.get(element) : active ? 1 : undefined
+    setStyle(element, 'order', order === undefined ? null : String(order))
+    const hidden = view.hideTasted && tile?.dataset.bpTasted === 'true'
     setStyle(element, 'display', hidden ? 'none' : null)
   }
 }
 
-// The Bolaget+ controls above a result list: "Visa: Alla · 3,5+ · 4,0+" and
-// "Sortera på betyg". Both work through CSS on the grid items rather than by
+// The Bolaget+ controls above a result list: "Dölj provade" and "Sortera:
+// Betyg · Prisvärt". Both work through CSS on the grid items rather than by
 // moving or removing them: the list is React's, and React re-renders a list
 // whose nodes were changed behind its back into the wrong order or an error.
-// Setting both back hands the list to the site unchanged.
+// Turning both off hands the list to the site unchanged.
 export function ensureListControls(
   list: Element,
   view: ListView,
@@ -935,34 +979,29 @@ export function ensureListControls(
     control.className = 'bp-sort'
     const current = control
 
-    const filter = document.createElement('div')
-    filter.className = 'bp-filter'
-    filter.setAttribute('role', 'group')
-    filter.setAttribute('aria-label', t('minRating'))
-    const label = document.createElement('span')
-    label.textContent = `${t('show')}:`
-    label.setAttribute('aria-hidden', 'true')
-    filter.appendChild(label)
-    for (const minRating of MIN_RATING_OPTIONS) {
+    const sort = document.createElement('div')
+    sort.className = 'bp-filter'
+    sort.setAttribute('role', 'group')
+    sort.setAttribute('aria-label', t('sort'))
+    const sortLabel = document.createElement('span')
+    sortLabel.textContent = `${t('sort')}:`
+    sortLabel.setAttribute('aria-hidden', 'true')
+    sort.appendChild(sortLabel)
+    for (const [sortBy, text] of [
+      ['rating', t('sortRating')],
+      ['value', t('sortValue')]
+    ] as const) {
       const option = document.createElement('button')
       option.type = 'button'
-      option.dataset.min = String(minRating)
-      option.textContent =
-        minRating === 0 ? t('showAll') : `${formatScore(minRating)}+`
+      option.dataset.sortBy = sortBy
+      option.textContent = text
+      // Pressing the active one again turns sorting off.
       option.addEventListener('click', () => {
-        onChange({ ...readListView(current), minRating })
+        const view = readListView(current)
+        onChange({ ...view, sortBy: view.sortBy === sortBy ? 'none' : sortBy })
       })
-      filter.appendChild(option)
+      sort.appendChild(option)
     }
-
-    const sort = document.createElement('button')
-    sort.type = 'button'
-    sort.className = 'bp-sort-toggle'
-    sort.textContent = t('sortByRating')
-    sort.addEventListener('click', () => {
-      const view = readListView(current)
-      onChange({ ...view, sortByRating: !view.sortByRating })
-    })
 
     const hideTasted = document.createElement('button')
     hideTasted.type = 'button'
@@ -973,25 +1012,23 @@ export function ensureListControls(
       onChange({ ...view, hideTasted: !view.hideTasted })
     })
 
-    control.append(filter, hideTasted, sort)
+    control.append(hideTasted, sort)
     list.before(control)
   }
 
-  control.dataset.min = String(view.minRating)
-  control.dataset.sort = String(view.sortByRating)
+  control.dataset.sort = view.sortBy
   control.dataset.hideTasted = String(view.hideTasted)
   control
     .querySelector('.bp-hide-tasted')
     ?.setAttribute('aria-pressed', String(view.hideTasted))
-  for (const option of control.querySelectorAll<HTMLElement>('[data-min]')) {
+  for (const option of control.querySelectorAll<HTMLElement>(
+    '[data-sort-by]'
+  )) {
     option.setAttribute(
       'aria-pressed',
-      String(Number(option.dataset.min) === view.minRating)
+      String(option.dataset.sortBy === view.sortBy)
     )
   }
-  control
-    .querySelector('.bp-sort-toggle')
-    ?.setAttribute('aria-pressed', String(view.sortByRating))
 }
 
 export function injectCardSpinner(
@@ -1068,6 +1105,30 @@ export function replaceCardSpinner(
   findCardAnchor(card)?.insertAdjacentElement('afterend', badge)
 }
 
+// How much better each card is rated than is usual for its price, in rating
+// points. Ratings rise with price (a 300 kr wine is expected to beat a 90 kr
+// one), so the cards on the list are fitted with a straight line of rating
+// against log price per litre, and each card scores its distance above that
+// line: "3,9 where 3,5 is normal at this price" outranks "4,1 where 4,2 is".
+// With too few cards to fit a line it falls back to rating per log price.
+export function valueScores(
+  cards: { pricePerLitre: number; rating: number }[]
+): number[] {
+  const xs = cards.map((card) => Math.log(card.pricePerLitre))
+  const ys = cards.map((card) => card.rating)
+  const n = cards.length
+  const meanX = xs.reduce((sum, x) => sum + x, 0) / n
+  const meanY = ys.reduce((sum, y) => sum + y, 0) / n
+  const spread = xs.reduce((sum, x) => sum + (x - meanX) ** 2, 0)
+  if (n < 5 || spread === 0) {
+    return cards.map((card, i) => card.rating / xs[i])
+  }
+  const slope =
+    xs.reduce((sum, x, i) => sum + (x - meanX) * (ys[i] - meanY), 0) / spread
+  const intercept = meanY - slope * meanX
+  return ys.map((y, i) => y - (intercept + slope * xs[i]))
+}
+
 // Stars (wine) or bottle caps (beer, cider) for a score. The icons are our own
 // static SVG markup, parsed rather than assigned through innerHTML: Mozilla's
 // add-on review flags every innerHTML assignment, trusted or not.
@@ -1086,8 +1147,9 @@ function createRatingIcons(productType: ProductType, score: number): Node {
 function readListView(control: HTMLElement): ListView {
   return {
     hideTasted: control.dataset.hideTasted === 'true',
-    minRating: Number(control.dataset.min ?? 0),
-    sortByRating: control.dataset.sort === 'true'
+    sortBy: (['rating', 'value'].includes(control.dataset.sort ?? '')
+      ? control.dataset.sort
+      : 'none') as ListSort
   }
 }
 
@@ -1166,7 +1228,7 @@ function generateStarsSvg(rating: number): string {
       starsHtml += starSvg(redColor)
     } else if (rating >= i + 0.5) {
       // Half red star using linear gradient
-      const gradientId = `bp-half-star-${i.toString()}`
+      const gradientId = `bp-half-star-${nextGradientId()}`
       starsHtml += `
           <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <defs>
