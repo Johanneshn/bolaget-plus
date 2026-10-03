@@ -1,10 +1,13 @@
 allVintages: alla årgångar
 brewery: Bryggeri
+checkedInOnUntappd: Incheckad på Untappd
 choose: Välj
 closestMatches: Närmaste träffar
+hideTasted: Dölj provade
 linkToUntappd: Länk till Untappd
 linkToVivino: Länk till Vivino
 loading: Laddar...
+markTasted: Markera som provad
 minRating: Lägsta betyg
 noMatch: Tyvärr, vi kunde inte hitta något betyg för denna produkt.
 noRatingYet: Inte tillräckligt många betyg än
@@ -16,6 +19,7 @@ searchAtVivino: Sök hos Vivino
 show: Visa
 showAll: Alla
 sortByRating: Sortera på betyg
+tasted: Provad
 uncertainMatch: Kunde inte hitta en exakt matchning, du kan själv söka via länken nedan.
 undo: Ångra
 vintage: Årgång

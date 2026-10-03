@@ -20,6 +20,7 @@ import {
   wineFeatureEnabled
 } from '@/components/settings'
 import { t } from '@/components/strings'
+import { getTastedSource, setTasted } from '@/components/tasted'
 
 export default defineContentScript({
   main() {
@@ -81,6 +82,7 @@ async function handleListCard(card: Element) {
   const productId = productUtils.getCardProductId(card)
   const name = productUtils.getCardName(card)
   if (!productId || !name) return
+  await markCardTasted(card, productId)
 
   // Vivino only rates bottled wine, same as on the product page — leave the
   // card untouched rather than badge a box with a bottle's rating.
@@ -102,13 +104,42 @@ async function handleListCard(card: Element) {
     producer: productUtils.getProducer(productId) ?? undefined
   })
   domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
+  // A beer can count as tasted through the Untappd history, which needs the
+  // matched beer's link.
+  await markCardTasted(card, productId, rating.link)
   const list = card.closest('ul')
   if (list) domUtils.applyListView(list, listView)
 }
 
+async function markCardTasted(
+  card: Element,
+  productId: string,
+  untappdLink?: null | string
+) {
+  const source = await getTastedSource(productId, untappdLink)
+  domUtils.markCardTasted(card, source !== null)
+  const list = card.closest('ul')
+  if (list && listView.hideTasted) domUtils.applyListView(list, listView)
+}
+
+// The "Provad" toggle on a product page. Re-rendered after the rating
+// arrives, since a beer may count as tasted through its Untappd match.
+async function showTastedState(productId: string, untappdLink?: null | string) {
+  const source = await getTastedSource(productId, untappdLink)
+  domUtils.setTastedState(source, (tasted) => {
+    void setTasted(productId, tasted).then(() =>
+      showTastedState(productId, untappdLink)
+    )
+  })
+}
+
 // How result lists are shown (sorted, filtered). Kept for the tab's lifetime,
 // so it carries over to the next page of results.
-let listView: domUtils.ListView = { minRating: 0, sortByRating: false }
+let listView: domUtils.ListView = {
+  hideTasted: false,
+  minRating: 0,
+  sortByRating: false
+}
 
 function addListControls(card: Element) {
   const list = card.closest('ul')
@@ -119,7 +150,7 @@ function addListControls(card: Element) {
     domUtils.applyListView(list, view)
     // Cards are only looked up once scrolled into view; sorting or filtering
     // needs them all. The fetch queue paces the lookups as usual.
-    if (view.sortByRating || view.minRating > 0) {
+    if (view.sortByRating || view.minRating > 0 || view.hideTasted) {
       for (const link of list.querySelectorAll(
         productUtils.CARD_LINK_SELECTOR
       )) {
@@ -179,6 +210,8 @@ async function tryInsertOnProductPage(force = false) {
   }
 
   domUtils.injectRatingContainer()
+  const pageProductId = productUtils.getProductId()
+  if (pageProductId) void showTastedState(pageProductId)
   if (productType == ProductType.Wine && !productUtils.isBottle()) {
     domUtils.setMessage(t('notOnBottle'))
     return
@@ -211,6 +244,9 @@ async function tryInsertOnProductPage(force = false) {
     )
     if (activeRequest !== request) return
     handleRating(productId, productType, rating)
+    if (productType !== ProductType.Wine) {
+      void showTastedState(productId, rating.link)
+    }
   } catch {
     if (activeRequest === request) {
       domUtils.setMessage(t('noMatch'))
