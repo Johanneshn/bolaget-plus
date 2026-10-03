@@ -6,6 +6,7 @@ import {
   getCard,
   getCardCountry,
   getCardName,
+  getCardPricePerLitre,
   getCardProductId,
   getCardProductType,
   getProducer,
@@ -191,6 +192,29 @@ describe('getCardCountry', () => {
     const card = renderCard({ country: '' })
 
     expect(getCardCountry(card)).toBeNull()
+  })
+})
+
+describe('getCardPricePerLitre', () => {
+  function tile(price: string, details: string): Element {
+    document.body.innerHTML = `<div data-slot="product-tile"><div data-slot="product-summary-metadata">${details}</div><div data-slot="product-summary-price"><p aria-hidden="true">${price}</p><span>…</span></div></div>`
+    const card = document.querySelector('[data-slot="product-tile"]')
+    if (!card) throw new Error('tile not rendered')
+    return card
+  }
+
+  it.each([
+    ['149:-', '750 ml · 13 % vol. · Nr 1', 198.67],
+    ['29:90', '330 ml · 5 % vol. · Nr 2', 90.61],
+    ['249:-', '3 l · 13 % vol. · Nr 3', 83],
+    ['1 249:-', '75 cl · 40 % vol. · Nr 4', 1665.33]
+  ])('reads %s for %s', (price, details, expected) => {
+    expect(getCardPricePerLitre(tile(price, details))).toBeCloseTo(expected, 1)
+  })
+
+  it('is null without a price or a volume', () => {
+    expect(getCardPricePerLitre(tile('', '750 ml'))).toBeNull()
+    expect(getCardPricePerLitre(tile('149:-', 'Nr 1'))).toBeNull()
   })
 })
 

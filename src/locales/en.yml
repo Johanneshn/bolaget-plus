@@ -8,7 +8,6 @@ linkToUntappd: Link to Untappd
 linkToVivino: Link to Vivino
 loading: Loading...
 markTasted: Mark as tasted
-minRating: Minimum rating
 noMatch: Sorry, we could not find any rating for this product.
 noRatingYet: Not enough ratings yet
 notOnBottle: The Wine isn't bottled.
@@ -16,9 +15,9 @@ of: of
 rating: Rating
 searchAtUntappd: Search at Untappd
 searchAtVivino: Search at Vivino
-show: Show
-showAll: All
-sortByRating: Sort by rating
+sort: Sort
+sortRating: Rating
+sortValue: Value
 tasted: Tasted
 uncertainMatch: Could not find an exact match, you can search yourself via the link below.
 undo: Undo
