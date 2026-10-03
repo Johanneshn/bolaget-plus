@@ -525,15 +525,12 @@ function positionZoomPreview(
 
 const CARD_RATING_CLASS = 'bp-card-rating'
 
-export function injectCardSpinner(
-  card: Element,
-  productId: string
-): HTMLElement | null {
+export function injectCardSpinner(card: Element): HTMLElement | null {
   if (card.querySelector(`.${CARD_RATING_CLASS}, .bp-card-spinner-inline`)) {
     return null
   }
   ensureStyles()
-  const anchor = findCardAnchor(card, productId)
+  const anchor = findCardAnchor(card)
   if (!anchor) return null
 
   const spinner = document.createElement('div')
@@ -545,7 +542,6 @@ export function injectCardSpinner(
 export function replaceCardSpinner(
   card: Element,
   spinner: HTMLElement,
-  productId: string,
   productType: ProductType,
   rating: RatingResponse
 ): void {
@@ -568,33 +564,14 @@ export function replaceCardSpinner(
   // was in flight, detaching the spinner — so re-resolve the anchor instead of
   // replacing a node that may no longer be in the card.
   if (card.querySelector(`.${CARD_RATING_CLASS}`)) return
-  findCardAnchor(card, productId)?.insertAdjacentElement('afterend', badge)
+  findCardAnchor(card)?.insertAdjacentElement('afterend', badge)
 }
 
-// Finds the element rendering the "Nr {productId}" line on a list card.
-// Systembolaget's class names are hashed build artifacts that reshuffle
-// between deploys, so the product-number text is the only stable anchor.
-function findCardAnchor(card: Element, productId: string): Element | null {
-  const nrPattern = new RegExp(`^Nr\\s*${productId}$`)
-  const matchesNr = (el: Element) =>
-    nrPattern.test(el.textContent.replace(/\s+/g, ' ').trim())
-
-  let anchor: Element | null = null
-  for (const el of card.querySelectorAll('*')) {
-    if (matchesNr(el)) anchor = el
-  }
-  if (!anchor) return null
-
-  // Climb to the outermost element that renders only the "Nr …" line, so the
-  // badge is inserted as a sibling block below it rather than inside it.
-  while (
-    anchor.parentElement &&
-    anchor.parentElement !== card &&
-    matchesNr(anchor.parentElement)
-  ) {
-    anchor = anchor.parentElement
-  }
-  return anchor
+// The line a card's badge goes under: the "750 ml · 13 % vol. · Nr 223701"
+// details below the name. Located by its data-slot name, which — unlike the
+// utility class names around it — says what the element is.
+function findCardAnchor(card: Element): Element | null {
+  return card.querySelector('[data-slot="product-summary-metadata"]')
 }
 
 function generateStarsSvg(rating: number): string {

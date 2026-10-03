@@ -1,38 +1,58 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { ProductType } from '@/@types/types'
 import {
+  getCard,
   getCardCountry,
   getCardName,
+  getCardProductId,
+  getCardProductType,
   getProducer,
   getProductName,
   isCardBottle
 } from '@/components/productUtils'
 
-// A list card as Systembolaget renders it: category line, name, subtitle,
-// the "Nr {productNumber}" line, then the format/price details.
+// A list card as Systembolaget renders it: a tile whose title link carries the
+// name for the eye and, for screen readers, the name, subtitle, packaging and
+// volume; then the subtitle, the details line and the country.
 function renderCard(options: {
   category?: string
-  details?: string[]
+  country?: string
+  packaging?: null | string
   productId?: string
   subtitle?: string
   title?: string
+  volume?: string
 }): Element {
   const {
     category = 'Rött vin, Fylligt & Smakrikt',
-    details = ['Flaska, 750 ml', '129:00', '172:00 kr/l'],
+    country = 'Italien',
+    packaging = 'Flaska',
     productId = '203701',
     subtitle = '2021',
-    title = 'Amadio'
+    title = 'Amadio',
+    volume = '750 ml'
   } = options
 
-  const lines = [category, title, subtitle, `Nr ${productId}`, ...details]
+  const label = [title, subtitle, packaging, volume].filter(Boolean).join(', ')
   document.body.innerHTML = `
-    <a id="tile:${productId}" href="/produkt/vin/amadio-${productId}/">
-      ${lines.map((line) => `<p>${line}</p>`).join('')}
-    </a>`
+    <div data-slot="product-tile">
+      <div data-slot="product-summary-content">
+        <p data-slot="product-summary-category">${category}</p>
+        <h3 data-slot="product-summary-title">
+          <a data-slot="product-tile-action" href="/produkt/vin/amadio-${productId}/">
+            <span aria-hidden="true">${title}</span>
+            <span class="sr-only">${label}</span>
+          </a>
+        </h3>
+        <p data-slot="product-summary-subtitle">${subtitle}</p>
+        <div data-slot="product-summary-metadata">${volume} · 13 % vol. · Nr ${productId}</div>
+        <div data-slot="product-summary-country"><p>${country}</p></div>
+      </div>
+    </div>`
 
-  const card = document.querySelector('a')
+  const card = document.querySelector('[data-slot="product-tile"]')
   if (!card) throw new Error('card not rendered')
   return card
 }
@@ -64,27 +84,42 @@ beforeEach(() => {
   document.body.innerHTML = ''
 })
 
+describe('getCard', () => {
+  it('resolves a product link to the tile it sits in', () => {
+    const card = renderCard({ productId: '262708' })
+    const link = card.querySelector('a')
+    if (!link) throw new Error('link not rendered')
+
+    expect(getCard(link)).toBe(card)
+    expect(getCardProductId(card)).toBe('262708')
+    expect(getCardProductType(card)).toBe(ProductType.Wine)
+  })
+})
+
 describe('isCardBottle', () => {
-  it('accepts a card whose details say nothing about the packaging', () => {
-    const card = renderCard({ details: ['750 ml', '129:00'] })
+  it('accepts a card packaged as a bottle', () => {
+    const card = renderCard({ packaging: 'Lättare glasflaska' })
 
     expect(isCardBottle(card, '203701')).toBe(true)
   })
 
-  it('rejects a bag-in-box card', () => {
-    const card = renderCard({ details: ['Bag-in-Box, 3000 ml', '249:00'] })
+  it('accepts a card whose label names no packaging', () => {
+    const card = renderCard({ packaging: null })
+
+    expect(isCardBottle(card, '203701')).toBe(true)
+  })
+
+  it.each([
+    ['Bag-in-Box', '3000 ml'],
+    ['Box', '3000 ml'],
+    ['Burk', '250 ml'],
+    ['PET-flaska', '750 ml'],
+    ['Fat', '20 l']
+  ])('rejects a card packaged as %s', (packaging, volume) => {
+    const card = renderCard({ packaging, volume })
 
     expect(isCardBottle(card, '203701')).toBe(false)
   })
-
-  it.each(['Box, 3000 ml', 'Burk, 250 ml', 'PET-flaska, 750 ml', 'Fat, 20 l'])(
-    'rejects a card packaged as %s',
-    (packaging) => {
-      const card = renderCard({ details: [packaging, '249:00'] })
-
-      expect(isCardBottle(card, '203701')).toBe(false)
-    }
-  )
 
   it('ignores a format word that is part of the product name', () => {
     const card = renderCard({ title: 'Boxwood Petit Verdot' })
@@ -93,15 +128,17 @@ describe('isCardBottle', () => {
   })
 
   it('ignores a format word that is only part of a longer word', () => {
-    const card = renderCard({ details: ['Flaska, 750 ml', 'Fatlagrat'] })
+    // No packaging in the label, so the segment before the volume is the
+    // subtitle.
+    const card = renderCard({ packaging: null, subtitle: 'Fatamorgana' })
 
     expect(isCardBottle(card, '203701')).toBe(true)
   })
 
   it('reads the packaging from the embedded page data when present', () => {
     renderPageData([{ packagingLevel1: 'Box', productNumber: '203701' }])
-    // Details deliberately look like a bottle — the page data is authoritative.
-    const card = renderCard({ details: ['3000 ml', '249:00'] })
+    // The label deliberately says bottle — the page data is authoritative.
+    const card = renderCard({})
 
     expect(isCardBottle(card, '203701')).toBe(false)
   })
@@ -113,63 +150,46 @@ describe('isCardBottle', () => {
     expect(isCardBottle(card, '203701')).toBe(true)
   })
 
-  it('falls back to the card text when the page data is unparseable', () => {
+  it('falls back to the card label when the page data is unparseable', () => {
     const script = document.createElement('script')
     script.id = '__NEXT_DATA__'
     script.textContent = '{ not json'
     document.head.appendChild(script)
-    const card = renderCard({ details: ['Box, 3000 ml'] })
+    const card = renderCard({ packaging: 'Box', volume: '3000 ml' })
 
     expect(isCardBottle(card, '203701')).toBe(false)
   })
 
-  it('assumes bottle when the product-number line is missing', () => {
-    const card = renderCard({ details: ['Box, 3000 ml'], productId: '203701' })
-    card.innerHTML = '<p>Amadio</p><p>Box, 3000 ml</p>'
+  it('assumes bottle when the label does not end in a volume', () => {
+    const card = renderCard({ packaging: 'Box', volume: '' })
 
     expect(isCardBottle(card, '203701')).toBe(true)
   })
 })
 
 describe('getCardCountry', () => {
-  it('reads the country out of a detail line', () => {
-    const card = renderCard({
-      details: ['Spanien, Kastilien-La Mancha', 'Flaska, 750 ml', '99:00']
-    })
+  it('reads the country line', () => {
+    const card = renderCard({ country: 'Spanien' })
 
-    expect(getCardCountry(card, '203701')).toBe('es')
-  })
-
-  it('matches the country however the line is punctuated', () => {
-    const card = renderCard({
-      details: ['Flaska · 750 ml · Sydafrika', '129:00']
-    })
-
-    expect(getCardCountry(card, '203701')).toBe('za')
+    expect(getCardCountry(card)).toBe('es')
   })
 
   it('folds the Swedish spelling to the same code as the English one', () => {
-    const card = renderCard({ details: ['Österrike', '129:00'] })
+    const card = renderCard({ country: 'Österrike' })
 
-    expect(getCardCountry(card, '203701')).toBe('at')
+    expect(getCardCountry(card)).toBe('at')
   })
 
   it('ignores a country word in the wine name', () => {
-    // The two lines above the product number are the name and subtitle; a wine
-    // called "Chile" is not a country line.
-    const card = renderCard({
-      details: ['Flaska, 750 ml', '99:00'],
-      subtitle: 'Chile',
-      title: 'Chile'
-    })
+    const card = renderCard({ subtitle: 'Chile', title: 'Chile' })
 
-    expect(getCardCountry(card, '203701')).toBeNull()
+    expect(getCardCountry(card)).toBe('it')
   })
 
-  it('is null when no line names a country it knows', () => {
-    const card = renderCard({ details: ['Flaska, 750 ml', '99:00'] })
+  it('is null when the country line names no country it knows', () => {
+    const card = renderCard({ country: '' })
 
-    expect(getCardCountry(card, '203701')).toBeNull()
+    expect(getCardCountry(card)).toBeNull()
   })
 })
 
@@ -221,7 +241,7 @@ describe('getProducer', () => {
 })
 
 describe('getCardName', () => {
-  it('joins the name and subtitle above the product-number line', () => {
+  it('joins the name and subtitle', () => {
     const card = renderCard({
       subtitle: 'Brunello di Montalcino, 2021',
       title: 'Armatura'
@@ -236,7 +256,7 @@ describe('getCardName', () => {
     expect(getCardName(card)).toBe('Amadio')
   })
 
-  it('drops the category line', () => {
+  it('leaves out the category line and the screen-reader label', () => {
     const card = renderCard({ subtitle: '' })
 
     expect(getCardName(card)).toBe('Amadio')

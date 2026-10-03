@@ -1,11 +1,18 @@
 import { ProductType } from '@/@types/types'
 import { countryCodeFromName } from '@/components/countries'
 
-// The category line shown above the product name on list cards
-// ("Vitt vin, Friskt & fruktigt", "Öl, Ljus lager, …") — it must not leak
-// into the search query sent to Vivino/Untappd.
-const CATEGORY_LINE =
-  /^(blanddryck|cider|mousserande|rosé|rött vin|vin|vitt vin|öl)[^,]*,/i
+// A list card is a `[data-slot="product-tile"]` whose parts carry their own
+// data-slot names. Systembolaget's class names are utility classes that
+// reshuffle between redesigns; the slot names describe what each part is, so
+// they are what a card is read by.
+export const CARD_LINK_SELECTOR = 'a[data-slot="product-tile-action"]'
+const CARD_SELECTOR = '[data-slot="product-tile"]'
+const CARD_TITLE_SELECTOR = '[data-slot="product-summary-title"]'
+const CARD_SUBTITLE_SELECTOR = '[data-slot="product-summary-subtitle"]'
+const CARD_COUNTRY_SELECTOR = '[data-slot="product-summary-country"]'
+
+// The last segment of a card link's accessible label: "750 ml", "3 l".
+const VOLUME_SEGMENT = /^\d[\d\s,.]*(cl|l|ml)$/i
 
 // A subtitle that is nothing but the vintage ("2021"), as products without a
 // grape or appellation line render it.
@@ -18,66 +25,45 @@ interface PageProduct {
   producer?: string
 }
 
+// The card a product link belongs to, for a link the page has just rendered.
+export function getCard(link: Element): Element {
+  return link.closest(CARD_SELECTOR) ?? link
+}
+
 // A list card's country, as an ISO alpha-2 code. The embedded page data does
 // not cover list pages at all — /sortiment/ ships CMS content only and fetches
-// its products client-side — so the card's own text is the one place a card
-// can be asked. Read by matching known country names rather than by position:
-// the detail lines have no fixed order, and a line that names no country we
-// know of simply yields nothing.
-export function getCardCountry(
-  card: Element,
-  productId: string
-): null | string {
-  const lines = getCardLines(card)
-  const nrIndex = findProductNumberLine(lines, productId)
-  // The two lines above the product number are the name and subtitle — prose,
-  // where a country word would be part of a wine's name, not its origin.
-  const searchable =
-    nrIndex < 0
-      ? lines
-      : [
-          ...lines.slice(0, Math.max(0, nrIndex - 2)),
-          ...lines.slice(nrIndex + 1)
-        ]
-
-  for (const line of searchable) {
-    for (const segment of line.split(/[,·•|]/)) {
-      const code = countryCodeFromName(segment)
-      if (code) {
-        return code
-      }
-    }
-  }
-  return null
+// its products client-side — so the card's own country line ("Italien", next
+// to the flag) is the one place a card can be asked.
+export function getCardCountry(card: Element): null | string {
+  return (
+    countryCodeFromName(
+      card.querySelector(CARD_COUNTRY_SELECTOR)?.textContent
+    ) ?? null
+  )
 }
 
 export function getCardName(card: Element): null | string {
-  const productId = getCardProductId(card)
-  if (!productId) return null
+  const title = card.querySelector(CARD_TITLE_SELECTOR)
+  if (!title) return null
 
-  // Anchor on the "Nr {productId}" line every card renders; the name and
-  // subtitle/vintage are the lines directly above it. Systembolaget's class
-  // names are hashed build artifacts (monopol-*, css-*) and reshuffle
-  // between deploys, so text structure is the only stable thing to hold on to.
-  const lines = getCardLines(card)
-  const nrIndex = findProductNumberLine(lines, productId)
-  if (nrIndex <= 0) return null
+  // The title link holds the name twice: once for the eye (aria-hidden) and
+  // once, with subtitle and packaging appended, for screen readers.
+  const name = (
+    title.querySelector('[aria-hidden="true"]') ?? title
+  ).textContent.trim()
+  if (!name) return null
 
-  let titleLines = lines.slice(Math.max(0, nrIndex - 2), nrIndex)
-  if (titleLines.length > 1 && CATEGORY_LINE.test(titleLines[0])) {
-    titleLines = titleLines.slice(1)
-  }
-  if (titleLines.some((line) => CATEGORY_LINE.test(line))) return null
-
-  return buildSearchName(titleLines[0], titleLines[1] ?? '') || null
+  const subtitle =
+    card.querySelector(CARD_SUBTITLE_SELECTOR)?.textContent.trim() ?? ''
+  return buildSearchName(name, subtitle) || null
 }
 
 export function getCardProductId(card: Element): null | string {
-  return extractProductId(card.getAttribute('href') ?? '')
+  return extractProductId(getCardHref(card))
 }
 
 export function getCardProductType(card: Element): ProductType {
-  const href = card.getAttribute('href') ?? ''
+  const href = getCardHref(card)
   if (href.includes('/produkt/vin/')) return ProductType.Wine
   if (href.includes('/produkt/ol/')) return ProductType.Beer
   if (href.includes('/produkt/cider-blanddrycker/')) return ProductType.Cider
@@ -152,9 +138,10 @@ const NON_BOTTLE_FORMATS = [
   'pouch'
 ]
 
-// A list card's text is free-form (volume, price, availability, …) rather than
-// a packaging descriptor, so the formats have to match as whole words here:
-// "Bag-in-Box" and "PET" must hit, "Petit" and "fatlagrat" must not.
+// A card's packaging segment is read out of a label that also holds the name
+// and subtitle, so should the label ever come without one, the segment found
+// is prose — the formats have to match as whole words there: "Bag-in-Box" and
+// "PET" must hit, "Petit" and "Fatamorgana" must not.
 const NON_BOTTLE_PATTERN = new RegExp(
   `(?<![\\p{L}\\p{N}])(?:${NON_BOTTLE_FORMATS.join('|')})(?![\\p{L}\\p{N}])`,
   'iu'
@@ -188,17 +175,18 @@ export function isCardBottle(card: Element, productId: string): boolean {
     return !isNonBottlePackaging(packaging)
   }
 
-  // Cards the embedded page data doesn't cover (later result pages, filters
-  // applied after load) only leave their own text. Scan the lines below the
-  // product number — the name and category above it are prose, and a wine
-  // called "Box Wine Co" is not a box.
-  const lines = getCardLines(card)
-  const nrIndex = findProductNumberLine(lines, productId)
-  if (nrIndex < 0) {
+  // Cards the embedded page data doesn't cover (in practice all of them) only
+  // leave the title link's accessible label, which ends in the packaging and
+  // volume: "Crudo, Nerello Mascalese Frappato, 2025, Box, 3000 ml".
+  const segments = (getCardLink(card)?.textContent ?? '')
+    .split(',')
+    .map((segment) => segment.trim())
+  const volumeIndex = segments.length - 1
+  if (volumeIndex < 1 || !VOLUME_SEGMENT.test(segments[volumeIndex])) {
     return true
   }
 
-  return !NON_BOTTLE_PATTERN.test(lines.slice(nrIndex + 1).join(' '))
+  return !NON_BOTTLE_PATTERN.test(segments[volumeIndex - 1])
 }
 
 export function isListPage(): boolean {
@@ -286,16 +274,14 @@ function extractProductId(url: string): null | string {
   return /-(\d+)\/?$/.exec(url)?.[1] ?? null
 }
 
-function findProductNumberLine(lines: string[], productId: string): number {
-  const nrPattern = new RegExp(`^Nr\\s*${productId}$`)
-  return lines.findIndex((line) => nrPattern.test(line))
+function getCardHref(card: Element): string {
+  return getCardLink(card)?.getAttribute('href') ?? ''
 }
 
-function getCardLines(card: Element): string[] {
-  return (card as HTMLElement).innerText
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
+function getCardLink(card: Element): Element | null {
+  return card.matches(CARD_LINK_SELECTOR)
+    ? card
+    : card.querySelector(CARD_LINK_SELECTOR)
 }
 
 // Reads the packaging type from the format line under the product title, which
