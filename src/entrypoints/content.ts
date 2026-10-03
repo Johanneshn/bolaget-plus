@@ -41,7 +41,9 @@ export default defineContentScript({
     // Watched by its link rather than the tile itself: a tile renders as an
     // empty placeholder first and gains its link once the product has loaded.
     sentinel.on(productUtils.CARD_LINK_SELECTOR, (link) => {
-      listCardObserver.observe(productUtils.getCard(link))
+      const card = productUtils.getCard(link)
+      listCardObserver.observe(card)
+      addSortControl(card)
     })
   },
   matches: ['*://*.systembolaget.se/*']
@@ -100,6 +102,31 @@ async function handleListCard(card: Element) {
     producer: productUtils.getProducer(productId) ?? undefined
   })
   domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
+  const list = card.closest('ul')
+  if (sortByRating && list) domUtils.applyRatingOrder(list, true)
+}
+
+// Whether result lists are sorted by rating. Kept for the tab's lifetime, so
+// it carries over to the next page of results.
+let sortByRating = false
+
+function addSortControl(card: Element) {
+  const list = card.closest('ul')
+  if (!list) return
+  domUtils.ensureSortControl(list, sortByRating, (active) => {
+    sortByRating = active
+    domUtils.ensureSortControl(list, active, () => undefined)
+    domUtils.applyRatingOrder(list, active)
+    // Cards are only looked up once scrolled into view; a sort needs them
+    // all. The fetch queue paces the lookups as usual.
+    if (active) {
+      for (const link of list.querySelectorAll(
+        productUtils.CARD_LINK_SELECTOR
+      )) {
+        void handleListCard(productUtils.getCard(link))
+      }
+    }
+  })
 }
 
 function handleRating(

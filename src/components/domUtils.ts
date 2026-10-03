@@ -227,19 +227,7 @@ const STYLES = `
     display: flex;
     align-items: center;
     gap: 4px;
-    width: fit-content;
-    margin-top: 6px;
-    padding: 2px 8px;
-    border-radius: 999px;
-  }
-  /* Tinted by how good the rating is, so a list can be skimmed: green from
-     4.0 (the top tier on both Vivino and Untappd), grey from 3.5, none
-     below. */
-  .bp-card-rating[data-tier='high'] {
-    background: color-mix(in srgb, ${PRIMARY} 14%, transparent);
-  }
-  .bp-card-rating[data-tier='mid'] {
-    background: ${MUTED_BG};
+    margin-top: 4px;
   }
   .bp-card-rating svg { width: 14px; height: 14px; }
   .bp-card-rating .bp-card-score {
@@ -250,6 +238,26 @@ const STYLES = `
   .bp-card-rating .bp-card-votes {
     color: ${MUTED_FG};
     font-size: 11px;
+  }
+  .bp-sort {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 16px 8px;
+  }
+  .bp-sort button {
+    padding: 6px 14px;
+    border: 1px solid var(--border-strong, #26262640);
+    border-radius: 999px;
+    background: transparent;
+    color: ${FG};
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .bp-sort button[aria-pressed='true'] {
+    border-color: ${PRIMARY};
+    background: ${PRIMARY};
+    color: var(--primary-foreground, #ffffff);
   }
   .bp-card-spinner-inline {
     display: inline-block;
@@ -307,12 +315,6 @@ export function injectRatingContainer() {
   }
 
   ensureStyles()
-}
-
-export function ratingTier(score: number): 'high' | 'low' | 'mid' {
-  if (score >= 4) return 'high'
-  if (score >= 3.5) return 'mid'
-  return 'low'
 }
 
 export function setMessage(message: string) {
@@ -733,6 +735,43 @@ const CARD_RATING_CLASS = 'bp-card-rating'
 const CARD_PRODUCT_ATTRIBUTE = 'data-bp-product'
 const CARD_INJECTED_SELECTOR = `.${CARD_RATING_CLASS}, .bp-card-spinner-inline`
 
+// Orders the list's items by their badge, best first; unrated ones (not
+// loaded yet, not on Vivino, boxes) keep their place after them.
+export function applyRatingOrder(list: Element, active: boolean): void {
+  for (const item of list.children) {
+    const tile = item.querySelector<HTMLElement>('[data-slot="product-tile"]')
+    const rating = Number(tile?.dataset.bpRating ?? 0)
+    ;(item as HTMLElement).style.order =
+      active && rating > 0 ? String(-Math.round(rating * 100)) : ''
+  }
+}
+
+// "Sortera på betyg" above a result list. Sorting is CSS `order` on the grid
+// items, not moving them: the list is React's, and React re-renders a list
+// whose nodes were moved behind its back into the wrong order or an error.
+// Turning it off clears the order and the list is the site's again.
+export function ensureSortControl(
+  list: Element,
+  active: boolean,
+  onToggle: (active: boolean) => void
+): void {
+  ensureStyles()
+  let control = list.previousElementSibling
+  if (!control?.classList.contains('bp-sort')) {
+    control = document.createElement('div')
+    control.className = 'bp-sort'
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.textContent = t('sortByRating')
+    button.addEventListener('click', () => {
+      onToggle(button.getAttribute('aria-pressed') !== 'true')
+    })
+    control.appendChild(button)
+    list.before(control)
+  }
+  control.querySelector('button')?.setAttribute('aria-pressed', String(active))
+}
+
 export function injectCardSpinner(
   card: Element,
   productId: string
@@ -772,7 +811,6 @@ export function replaceCardSpinner(
   const badge = document.createElement('div')
   badge.className = CARD_RATING_CLASS
   badge.setAttribute(CARD_PRODUCT_ATTRIBUTE, productId)
-  badge.dataset.tier = ratingTier(rating.rating)
   badge.setAttribute('role', 'img')
   badge.setAttribute('aria-label', ratingLabel(rating))
   badge.innerHTML = `
@@ -785,6 +823,7 @@ export function replaceCardSpinner(
   // tile — so re-check both instead of replacing a node that may be gone.
   if (card.querySelector(`.${CARD_RATING_CLASS}`)) return
   if (getCardProductId(card) !== productId) return
+  ;(card as HTMLElement).dataset.bpRating = rating.rating.toString()
   findCardAnchor(card)?.insertAdjacentElement('afterend', badge)
 }
 
