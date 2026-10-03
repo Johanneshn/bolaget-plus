@@ -103,19 +103,29 @@ const STYLES = `
     flex-direction: column;
     margin-top: 6px;
   }
+  #${RATING_CONTAINER_ID} .bp-alt-list[hidden] {
+    display: none;
+  }
   #${RATING_CONTAINER_ID} .bp-alt-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 10px;
     min-height: 44px;
-    padding: 6px 8px;
     border-top: 1px solid ${BORDER};
+  }
+  #${RATING_CONTAINER_ID} .bp-alt-link {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 8px;
     color: ${FG};
     text-decoration: none;
   }
-  #${RATING_CONTAINER_ID} .bp-alt-item:hover,
-  #${RATING_CONTAINER_ID} .bp-alt-item:active {
+  #${RATING_CONTAINER_ID} .bp-alt-link:hover,
+  #${RATING_CONTAINER_ID} .bp-alt-link:active {
     background: ${MUTED_BG};
   }
   #${RATING_CONTAINER_ID} .bp-alt-name {
@@ -129,14 +139,42 @@ const STYLES = `
     overflow: hidden;
   }
   #${RATING_CONTAINER_ID} .bp-alt-score {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-weight: 700;
     font-size: 13px;
     white-space: nowrap;
+  }
+  #${RATING_CONTAINER_ID} .bp-alt-score svg {
+    width: 11px;
+    height: 11px;
   }
   #${RATING_CONTAINER_ID} .bp-alt-votes {
     color: ${MUTED_FG};
     font-size: 11px;
     font-weight: 400;
+  }
+  #${RATING_CONTAINER_ID} .bp-text-button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: ${FG};
+    font: inherit;
+    font-size: 13px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  #${RATING_CONTAINER_ID} .bp-choose {
+    flex-shrink: 0;
+    padding: 6px 4px;
+    font-weight: 600;
+  }
+  #${RATING_CONTAINER_ID} .bp-correction {
+    margin-top: 8px;
+    color: ${MUTED_FG};
+    font-size: 13px;
   }
   #${RATING_CONTAINER_ID} .bp-thumb {
     width: 36px;
@@ -214,6 +252,12 @@ const STYLES = `
   }
 `
 
+// What the user can do about a match: pick another candidate, or undo a pick.
+export interface MatchActions {
+  onChoose?: (pick: RatingAlternative) => void
+  onUndo?: () => void
+}
+
 export function getAndClearContainer(): HTMLElement {
   let container = document.getElementById(RATING_CONTAINER_BODY_ID)
   if (!container) {
@@ -266,7 +310,8 @@ export function setRating(
   productType: ProductType,
   rating: RatingResponse,
   link: null | string,
-  vintageYear: null | string = null
+  vintageYear: null | string = null,
+  actions: MatchActions = {}
 ) {
   const ratingContainer = getAndClearContainer()
 
@@ -320,9 +365,16 @@ export function setRating(
     meta.innerText += ` · ${i18n.t('allVintages')}`
     ratingContainer.appendChild(vintage)
   }
+
+  const correction = createCorrection(productType, rating, actions)
+  if (correction) ratingContainer.appendChild(correction)
 }
 
-export function setUncertain(productType: ProductType, rating: RatingResponse) {
+export function setUncertain(
+  productType: ProductType,
+  rating: RatingResponse,
+  onChoose?: (pick: RatingAlternative) => void
+) {
   const ratingContainer = getAndClearContainer()
   const alternatives = rating.alternatives ?? []
 
@@ -335,12 +387,9 @@ export function setUncertain(productType: ProductType, rating: RatingResponse) {
   ratingContainer.appendChild(message)
 
   if (alternatives.length > 0) {
-    const list = document.createElement('div')
-    list.className = 'bp-alt-list'
-    for (const alternative of alternatives) {
-      list.appendChild(createAlternativeItem(alternative))
-    }
-    ratingContainer.appendChild(list)
+    ratingContainer.appendChild(
+      createAlternativeList(productType, alternatives, onChoose)
+    )
   }
 
   const linkLabel =
@@ -369,38 +418,110 @@ export function showLoadingSpinner() {
   ratingContainer.appendChild(spinner)
 }
 
+// One candidate: a link to it on Vivino/Untappd (thumbnail, name, small stars
+// and score) and, when the user can correct the match, a button to pick it.
+// The two are siblings — a button cannot sit inside a link.
 function createAlternativeItem(
-  alternative: RatingAlternative
-): HTMLAnchorElement {
-  const item = document.createElement('a')
+  productType: ProductType,
+  alternative: RatingAlternative,
+  onChoose?: (pick: RatingAlternative) => void
+): HTMLElement {
+  const item = document.createElement('div')
   item.className = 'bp-alt-item'
-  item.href = alternative.link
-  item.target = '_blank'
-  item.rel = 'noopener noreferrer'
+
+  const link = document.createElement('a')
+  link.className = 'bp-alt-link'
+  link.href = alternative.link
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
 
   if (alternative.imageDataUrl) {
-    item.appendChild(createThumbnail(alternative.imageDataUrl, 'bp-alt-thumb'))
+    link.appendChild(createThumbnail(alternative.imageDataUrl, 'bp-alt-thumb'))
   }
 
   const name = document.createElement('span')
   name.className = 'bp-alt-name'
-  name.textContent = alternative.name
+  name.textContent = `${alternative.name} ↗`
 
   const score = document.createElement('span')
   score.className = 'bp-alt-score'
   // A score of 0 means the source has too few ratings to compute one yet.
-  score.textContent =
+  if (alternative.rating > 0) {
+    score.innerHTML =
+      productType === ProductType.Wine
+        ? generateStarsSvg(alternative.rating)
+        : generateCapSvg(alternative.rating)
+  }
+  const value = document.createElement('span')
+  value.textContent =
     alternative.rating > 0 ? alternative.rating.toString() : 'N/A'
+  score.appendChild(value)
   if (alternative.votes > 0) {
     const votes = document.createElement('span')
     votes.className = 'bp-alt-votes'
     votes.textContent = ` (${alternative.votes.toString()})`
     score.appendChild(votes)
   }
+  score.setAttribute('aria-label', ratingLabel(alternative))
 
-  item.appendChild(name)
-  item.appendChild(score)
+  link.appendChild(name)
+  link.appendChild(score)
+  item.appendChild(link)
+
+  if (onChoose) {
+    const choose = createTextButton(i18n.t('choose'), () => {
+      onChoose(alternative)
+    })
+    choose.classList.add('bp-choose')
+    item.appendChild(choose)
+  }
   return item
+}
+
+function createAlternativeList(
+  productType: ProductType,
+  alternatives: RatingAlternative[],
+  onChoose?: (pick: RatingAlternative) => void
+): HTMLElement {
+  const list = document.createElement('div')
+  list.className = 'bp-alt-list'
+  for (const alternative of alternatives) {
+    list.appendChild(createAlternativeItem(productType, alternative, onChoose))
+  }
+  return list
+}
+
+// Below a found match: "Ditt val · Ångra" on a match the user picked, or a
+// "Fel träff?" toggle that reveals the runners-up to pick from instead. The
+// list stays folded — most matches are right, and the card should say so.
+function createCorrection(
+  productType: ProductType,
+  rating: RatingResponse,
+  { onChoose, onUndo }: MatchActions
+): HTMLElement | null {
+  const row = document.createElement('div')
+  row.className = 'bp-correction'
+
+  if (rating.pinned) {
+    if (!onUndo) return null
+    row.append(`${i18n.t('yourPick')} · `)
+    row.appendChild(createTextButton(i18n.t('undo'), onUndo))
+    return row
+  }
+
+  const alternatives = rating.alternatives ?? []
+  if (!onChoose || alternatives.length === 0) return null
+
+  const list = createAlternativeList(productType, alternatives, onChoose)
+  list.hidden = true
+  const toggle = createTextButton(i18n.t('wrongMatch'), () => {
+    list.hidden = !list.hidden
+    toggle.setAttribute('aria-expanded', String(!list.hidden))
+  })
+  toggle.setAttribute('aria-expanded', 'false')
+  row.appendChild(toggle)
+  row.appendChild(list)
+  return row
 }
 
 function createSourceLink(
@@ -420,6 +541,19 @@ function createSourceLink(
     `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`
   )
   return linkElement
+}
+
+// A button that looks like the card's links: plain underlined text.
+function createTextButton(label: string, onClick: () => void): HTMLElement {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'bp-text-button'
+  button.textContent = label
+  button.addEventListener('click', (event) => {
+    event.preventDefault()
+    onClick()
+  })
+  return button
 }
 
 function createThumbnail(dataUrl: string, className: string): HTMLImageElement {
@@ -464,6 +598,16 @@ function createVintageLine(
     line.appendChild(score)
   }
   return line
+}
+
+// What a screen reader should say for a score shown as stars: "3.9 av 5, 412
+// röster" rather than five unlabelled images and a bare number.
+function ratingLabel(rating: { rating: number; votes: number }): string {
+  const score =
+    rating.rating > 0
+      ? `${rating.rating.toString()} ${i18n.t('of')} 5`
+      : i18n.t('noRatingYet')
+  return `${score}, ${rating.votes.toString()} ${i18n.t('votes')}`
 }
 
 let zoomPreview: HTMLImageElement | null = null

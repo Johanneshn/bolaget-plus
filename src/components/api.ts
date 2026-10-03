@@ -287,6 +287,8 @@ export async function fetchRatingFromUntappd(
 
     // Return only the response contract — similarityRate is internal.
     return {
+      // The runners-up, for the user to correct a wrong match with.
+      alternatives: toAlternatives(scored.slice(1)),
       brewery: bestMatch.brewery,
       link: bestMatch.link,
       name: bestMatch.name,
@@ -441,6 +443,11 @@ export async function fetchRatingFromVivino(
 
     // Return only the response contract — similarityRate/imageUrl are internal.
     return {
+      // The runners-up, without images, for the user to correct a wrong
+      // match with. Product pages only, like the vintages.
+      alternatives: includeImage
+        ? toAlternatives(candidates.filter((wine) => wine !== bestMatch))
+        : undefined,
       imageDataUrl: includeImage
         ? await fetchImage(bestMatch.imageUrl)
         : undefined,

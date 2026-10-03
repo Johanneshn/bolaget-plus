@@ -12,6 +12,7 @@ import {
 } from '@/@types/types'
 
 import { fetchRatingFromUntappd, fetchRatingFromVivino } from './api'
+import { getPinnedRating } from './pinnedMatches'
 import { saveRating as cacheRating, tryGetRating } from './ratingsCache'
 
 export async function fetchRating(
@@ -22,6 +23,11 @@ export async function fetchRating(
   facts: ProductFacts = {}
 ): Promise<RatingResponse> {
   try {
+    // A match the user picked by hand overrides any lookup.
+    const pinned = await getPinnedRating(productId)
+    if (pinned) {
+      return pinned
+    }
     const ratingRequest = {
       ...facts,
       includeImage,
@@ -121,6 +127,10 @@ export async function enqueueListFetch(
   // Cached ratings render immediately — only real network fetches go through
   // the throttled queue, so a revisited list page fills in instantly instead
   // of trickling one badge per delay tick.
+  const pinned = await getPinnedRating(productId).catch(() => null)
+  if (pinned) {
+    return pinned
+  }
   const cached = await tryGetRating({
     ...facts,
     includeImage: false,

@@ -1,5 +1,6 @@
 allVintages: alla årgångar
 brewery: Bryggeri
+choose: Välj
 closestMatches: Närmaste träffar
 linkToUntappd: Länk till Untappd
 linkToVivino: Länk till Vivino
@@ -12,5 +13,8 @@ rating: Betyg
 searchAtUntappd: Sök hos Untappd
 searchAtVivino: Sök hos Vivino
 uncertainMatch: Kunde inte hitta en exakt matchning, du kan själv söka via länken nedan.
+undo: Ångra
 vintage: Årgång
 votes: röster
+wrongMatch: Fel träff?
+yourPick: Ditt val

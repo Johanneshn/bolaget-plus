@@ -2,10 +2,16 @@ import sentinel from 'sentinel-js'
 
 import {
   ProductType,
+  type RatingAlternative,
   type RatingResponse,
   RatingResultStatus
 } from '@/@types/types'
 import * as domUtils from '@/components/domUtils'
+import {
+  getPinnedRating,
+  pinMatch,
+  unpinMatch
+} from '@/components/pinnedMatches'
 import * as productUtils from '@/components/productUtils'
 import { enqueueListFetch, fetchRating } from '@/components/ratingService'
 import {
@@ -27,8 +33,9 @@ export default defineContentScript({
       { rootMargin: '200px' }
     )
 
-    //eslint-disable-next-line @typescript-eslint/no-misused-promises
-    sentinel.on('h1', tryInsertOnProductPage)
+    sentinel.on('h1', () => {
+      void tryInsertOnProductPage()
+    })
     void tryInsertOnProductPage()
     // Watched by its link rather than the tile itself: a tile renders as an
     // empty placeholder first and gains its link once the product has loaded.
@@ -94,18 +101,36 @@ async function handleListCard(card: Element) {
   domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
 }
 
-function handleRating(productType: ProductType, rating: RatingResponse) {
+function handleRating(
+  productId: string,
+  productType: ProductType,
+  rating: RatingResponse
+) {
+  // The user can override the match by hand (pinnedMatches.ts) and undo that
+  // again; both re-render in place, and list cards pick the choice up from
+  // storage the next time they load.
+  const onChoose = (pick: RatingAlternative) => {
+    void pinMatch(productId, pick).then(async () => {
+      const pinned = await getPinnedRating(productId)
+      if (pinned) handleRating(productId, productType, pinned)
+    })
+  }
+  const onUndo = () => {
+    void unpinMatch(productId).then(() => tryInsertOnProductPage(true))
+  }
+
   switch (rating.status) {
     case RatingResultStatus.Found:
       domUtils.setRating(
         productType,
         rating,
         rating.link,
-        productUtils.getProductVintage()
+        productUtils.getProductVintage(),
+        { onChoose, onUndo }
       )
       return
     case RatingResultStatus.Uncertain:
-      domUtils.setUncertain(productType, rating)
+      domUtils.setUncertain(productType, rating, onChoose)
       return
     default:
       domUtils.setMessage(i18n.t('noMatch'))
@@ -113,7 +138,7 @@ function handleRating(productType: ProductType, rating: RatingResponse) {
   }
 }
 
-async function tryInsertOnProductPage() {
+async function tryInsertOnProductPage(force = false) {
   if (!(await featuresEnabled.getValue())) return
 
   const productType = productUtils.getProductType()
@@ -135,7 +160,7 @@ async function tryInsertOnProductPage() {
   if (
     !productId ||
     !productName ||
-    activeRequest?.productName === productName
+    (!force && activeRequest?.productName === productName)
   ) {
     return
   }
@@ -156,7 +181,7 @@ async function tryInsertOnProductPage() {
       }
     )
     if (activeRequest !== request) return
-    handleRating(productType, rating)
+    handleRating(productId, productType, rating)
   } catch {
     if (activeRequest === request) {
       domUtils.setMessage(i18n.t('noMatch'))
