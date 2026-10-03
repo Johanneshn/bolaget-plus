@@ -7,6 +7,7 @@ import {
   RatingResponse,
   RatingResultStatus
 } from '@/@types/types'
+import { getCardProductId } from '@/components/productUtils'
 
 const RATING_CONTAINER_ID = 'rating-container'
 const RATING_CONTAINER_BODY_ID = 'rating-container-body'
@@ -525,9 +526,21 @@ function positionZoomPreview(
 
 const CARD_RATING_CLASS = 'bp-card-rating'
 
-export function injectCardSpinner(card: Element): HTMLElement | null {
-  if (card.querySelector(`.${CARD_RATING_CLASS}, .bp-card-spinner-inline`)) {
-    return null
+// A badge or spinner names the product it was made for, since the SPA may
+// re-render a tile for another product (a new sort or filter) and keep the old
+// tile element, with our badge still in it.
+const CARD_PRODUCT_ATTRIBUTE = 'data-bp-product'
+const CARD_INJECTED_SELECTOR = `.${CARD_RATING_CLASS}, .bp-card-spinner-inline`
+
+export function injectCardSpinner(
+  card: Element,
+  productId: string
+): HTMLElement | null {
+  for (const injected of card.querySelectorAll(CARD_INJECTED_SELECTOR)) {
+    if (injected.getAttribute(CARD_PRODUCT_ATTRIBUTE) === productId) {
+      return null
+    }
+    injected.remove()
   }
   ensureStyles()
   const anchor = findCardAnchor(card)
@@ -535,6 +548,7 @@ export function injectCardSpinner(card: Element): HTMLElement | null {
 
   const spinner = document.createElement('div')
   spinner.className = 'bp-card-spinner-inline'
+  spinner.setAttribute(CARD_PRODUCT_ATTRIBUTE, productId)
   anchor.insertAdjacentElement('afterend', spinner)
   return spinner
 }
@@ -542,6 +556,7 @@ export function injectCardSpinner(card: Element): HTMLElement | null {
 export function replaceCardSpinner(
   card: Element,
   spinner: HTMLElement,
+  productId: string,
   productType: ProductType,
   rating: RatingResponse
 ): void {
@@ -555,15 +570,17 @@ export function replaceCardSpinner(
       : generateCapSvg(rating.rating)
   const badge = document.createElement('div')
   badge.className = CARD_RATING_CLASS
+  badge.setAttribute(CARD_PRODUCT_ATTRIBUTE, productId)
   badge.innerHTML = `
     ${svg}
     <span class="bp-card-score">${rating.rating.toString()}</span>
     <span class="bp-card-votes">(${rating.votes.toString()})</span>
   `
   // The SPA may have re-rendered the card's contents while the rating request
-  // was in flight, detaching the spinner — so re-resolve the anchor instead of
-  // replacing a node that may no longer be in the card.
+  // was in flight, detaching the spinner or putting another product in the
+  // tile — so re-check both instead of replacing a node that may be gone.
   if (card.querySelector(`.${CARD_RATING_CLASS}`)) return
+  if (getCardProductId(card) !== productId) return
   findCardAnchor(card)?.insertAdjacentElement('afterend', badge)
 }
 
