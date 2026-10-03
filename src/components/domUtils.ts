@@ -20,6 +20,7 @@ const STYLE_ID = 'bolaget-plus-css'
 const FG = 'var(--foreground, #262626)'
 const MUTED_FG = 'var(--muted-foreground, #262626b3)'
 const BORDER = 'var(--border, #2626261a)'
+const PRIMARY = 'var(--primary, #095741)'
 const MUTED_BG = 'var(--muted, #2626260d)'
 
 const STYLES = `
@@ -39,7 +40,7 @@ const STYLES = `
     font-weight: 500;
     letter-spacing: 2px;
     text-transform: uppercase;
-    color: ${MUTED_FG};
+    color: ${PRIMARY};
   }
   #${RATING_CONTAINER_ID} .bp-rating-row {
     display: flex;
