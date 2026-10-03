@@ -30,8 +30,10 @@ export default defineContentScript({
     //eslint-disable-next-line @typescript-eslint/no-misused-promises
     sentinel.on('h1', tryInsertOnProductPage)
     void tryInsertOnProductPage()
-    sentinel.on('a[id^="tile:"]', (card) => {
-      listCardObserver.observe(card)
+    // Watched by its link rather than the tile itself: a tile renders as an
+    // empty placeholder first and gains its link once the product has loaded.
+    sentinel.on(productUtils.CARD_LINK_SELECTOR, (link) => {
+      listCardObserver.observe(productUtils.getCard(link))
     })
   },
   matches: ['*://*.systembolaget.se/*']
@@ -79,17 +81,17 @@ async function handleListCard(card: Element) {
     return
   }
 
-  const spinner = domUtils.injectCardSpinner(card, productId)
+  const spinner = domUtils.injectCardSpinner(card)
   if (!spinner) return
 
   const rating = await enqueueListFetch(productId, name, productType, {
     // A card is on its own: the list page's embedded data holds no products,
     // so the card's own text is all there is — and the country is the part of
     // it the product page can be relied on to agree with.
-    country: productUtils.getCardCountry(card, productId) ?? undefined,
+    country: productUtils.getCardCountry(card) ?? undefined,
     producer: productUtils.getProducer(productId) ?? undefined
   })
-  domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
+  domUtils.replaceCardSpinner(card, spinner, productType, rating)
 }
 
 function handleRating(productType: ProductType, rating: RatingResponse) {

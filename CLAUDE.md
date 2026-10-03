@@ -65,17 +65,19 @@ external fetches are delegated to the background script.
    [sentinel-js](https://github.com/geoxor/sentinel-js) to watch for the `h1`
    element (Systembolaget is an SPA, so pages swap without full reloads) and
    triggers `tryInsertOnProductPage` on each new product title. It also
-   watches list-page product cards (`a[id^="tile:"]`) and, once a card
+   watches list-page product cards (`a[data-slot="product-tile-action"]`, the
+   title link inside each `[data-slot="product-tile"]`) and, once a card
    scrolls into view, injects a compact rating badge via a throttled fetch
    queue (`enqueueListFetch`, one request per 300 ms — cached ratings skip
    the queue and render immediately).
 2. `productUtils.ts` derives `ProductType` from the URL path (`/produkt/vin/`,
    `/produkt/ol/`, `/produkt/cider-blanddrycker/`), extracts the product name
-   from the `<h1>` (or from a card's text lines), and gates wine on
+   from the `<h1>` (or from a card's `data-slot` parts), and gates wine on
    `isBottle()` (Vivino only rates bottles, not box/bag-in-box/etc. — see the
    exclusion-list note in that file). `isCardBottle()` applies the same gate to
    list cards, reading the packaging from the `__NEXT_DATA__` payload when the
-   card's product is in it and falling back to the card's own detail lines.
+   card's product is in it and falling back to the packaging named in the card
+   link's screen-reader label ("…, Box, 3000 ml").
    Note that a *list* page's payload holds no products at all — `/sortiment/`
    ships CMS content and fetches its results client-side — so a card is in
    practice always read from its own text (`getCardCountry`), while a product
