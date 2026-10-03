@@ -81,7 +81,7 @@ async function handleListCard(card: Element) {
     return
   }
 
-  const spinner = domUtils.injectCardSpinner(card)
+  const spinner = domUtils.injectCardSpinner(card, productId)
   if (!spinner) return
 
   const rating = await enqueueListFetch(productId, name, productType, {
@@ -91,7 +91,7 @@ async function handleListCard(card: Element) {
     country: productUtils.getCardCountry(card) ?? undefined,
     producer: productUtils.getProducer(productId) ?? undefined
   })
-  domUtils.replaceCardSpinner(card, spinner, productType, rating)
+  domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
 }
 
 function handleRating(productType: ProductType, rating: RatingResponse) {
