@@ -4,84 +4,65 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="manifest.type" content="browser_action" />
-    <title>Inställningar</title>
+    <title>Bolaget+</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <div class="gradient-bg"></div>
-        <div class="content">
-            <div class="top-bar">
-                <button class="icon-button" id="shareButton" title="Share extension">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-                        <polyline points="16 6 12 2 8 6"></polyline>
-                        <line x1="12" y1="2" x2="12" y2="15"></line>
-                    </svg>
-                </button>
+    <main class="popup">
+        <header class="header">
+            <h1>Bolaget<span class="plus">+</span></h1>
+            <button type="button" class="icon-button" id="shareButton" aria-label="Kopiera länk till tillägget" title="Kopiera länk till tillägget">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                    <polyline points="16 6 12 2 8 6"></polyline>
+                    <line x1="12" y1="2" x2="12" y2="15"></line>
+                </svg>
+            </button>
+        </header>
+        <p class="status" id="shareStatus" role="status"></p>
+
+        <section class="settings" aria-labelledby="settingsHeading">
+            <h2 id="settingsHeading">Visa betyg för</h2>
+            <label class="toggle toggle-main">
+                <span>Alla produkter</span>
+                <input type="checkbox" role="switch" id="enabled" name="enabled">
+                <span class="slider" aria-hidden="true"></span>
+            </label>
+            <label class="toggle">
+                <span>Vin <small>Vivino</small></span>
+                <input type="checkbox" role="switch" id="wine" name="wine">
+                <span class="slider" aria-hidden="true"></span>
+            </label>
+            <label class="toggle">
+                <span>Öl <small>Untappd</small></span>
+                <input type="checkbox" role="switch" id="beer" name="beer">
+                <span class="slider" aria-hidden="true"></span>
+            </label>
+            <label class="toggle">
+                <span>Cider &amp; blanddryck <small>Untappd</small></span>
+                <input type="checkbox" role="switch" id="cider" name="cider">
+                <span class="slider" aria-hidden="true"></span>
+            </label>
+        </section>
+
+        <section class="data" aria-labelledby="dataHeading">
+            <h2 id="dataHeading">Sparat på den här datorn</h2>
+            <div class="data-row">
+                <span id="ratingsCount"></span>
+                <button type="button" class="text-button" id="clearRatings">Töm</button>
             </div>
-            <h2>Inställningar</h2>
-            <div class="settings">
-                <div class="toggle-container">
-                    <span class="toggle-label">Aktiverad</span>
-                    <label class="switch">
-                        <input type="checkbox" id="enabled" name="enabled">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="toggle-container">
-                    <span class="toggle-label">Vin</span>
-                    <label class="switch">
-                        <input type="checkbox" id="wine" name="wine">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="toggle-container">
-                    <span class="toggle-label">Öl</span>
-                    <label class="switch">
-                        <input type="checkbox" id="beer" name="beer">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="toggle-container">
-                    <span class="toggle-label">Cider &amp; blanddryck</span>
-                    <label class="switch">
-                        <input type="checkbox" id="cider" name="cider">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <!-- <div class="toggle-container">
-                    <span class="toggle-label">Sprit</span>
-                    <label class="switch">
-                        <input type="checkbox" id="sprit" disabled="true">
-                        <span class="slider"></span>
-                    </label>
-                </div> -->
+            <div class="data-row">
+                <span id="pinsCount"></span>
+                <button type="button" class="text-button" id="clearPins">Rensa</button>
             </div>
-            <div class="data">
-                <div class="data-row">
-                    <span id="ratingsCount"></span>
-                    <button type="button" class="text-button" id="clearRatings">Töm</button>
-                </div>
-                <div class="data-row">
-                    <span id="pinsCount"></span>
-                    <button type="button" class="text-button" id="clearPins">Rensa</button>
-                </div>
-            </div>
-            <div class="footer">
-                <span class="version">v1.0.0</span>
-                <a href="https://u24.gov.ua/" target="_blank" rel="noopener noreferrer" class="donate-link">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path>
-                    </svg>
-                    Donera
-                </a>
-                <a href="https://github.com/BroadcastDivers/bolaget-plus/issues" target="_blank" rel="noopener noreferrer" class="donate-link">
-                    Rapportera fel
-                </a>
-            </div>
-        </div>
-    </div>
+        </section>
+
+        <footer class="footer">
+            <span class="version"></span>
+            <a href="https://github.com/BroadcastDivers/bolaget-plus/issues" target="_blank" rel="noopener noreferrer">Rapportera fel</a>
+            <a href="https://u24.gov.ua/" target="_blank" rel="noopener noreferrer">Donera</a>
+        </footer>
+    </main>
     <script type="module" src="./main.ts"></script>
 </body>
 </html>

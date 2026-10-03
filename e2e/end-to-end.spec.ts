@@ -95,7 +95,7 @@ test('visiting a wine page with wine toggle disabled should not show wine', asyn
 
   await expect(page.locator('#enabled')).toBeChecked()
   await expect(page.locator('#wine')).toBeChecked()
-  await page.locator('div:nth-child(2) > .switch > .slider').click()
+  await page.locator('label:has(#wine)').click()
   await expect(page.locator('#wine')).not.toBeChecked()
 
   // act

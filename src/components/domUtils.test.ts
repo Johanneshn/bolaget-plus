@@ -44,7 +44,17 @@ beforeEach(() => {
 
 describe('replaceCardSpinner', () => {
   it('shows the score', () => {
-    expect(badge(renderCard('203701'), 3.8, 7606)).toBe('3.8')
+    expect(badge(renderCard('203701'), 3.8, 7606)).toBe('3,8')
+  })
+
+  it('writes numbers the way the Swedish page does', () => {
+    const card = renderCard('203701')
+    badge(card, 4, 98172)
+
+    expect(card.querySelector('.bp-card-score')?.textContent).toBe('4,0')
+    expect(card.querySelector('.bp-card-votes')?.textContent).toBe(
+      '(98\u00a0172)'
+    )
   })
 
   it('labels the badge for screen readers', () => {
@@ -53,12 +63,12 @@ describe('replaceCardSpinner', () => {
 
     expect(
       card.querySelector('.bp-card-rating')?.getAttribute('aria-label')
-    ).toBe('4.1 av 5, 812 röster')
+    ).toBe('4,1 av 5, 812 röster')
   })
 
   it('shows a score of 0 as not rated yet, not as zero', () => {
     // Vivino reports an average of 0 for a wine with too few ratings.
-    expect(badge(renderCard('203701'), 0, 24)).toBe('N/A')
+    expect(badge(renderCard('203701'), 0, 24)).toBe('–')
   })
 
   it('does not badge a tile that has moved on to another product', () => {
@@ -101,7 +111,7 @@ describe('setRating', () => {
     setRating(ProductType.Wine, rating, rating.link, '2024')
 
     const line = document.querySelector<HTMLAnchorElement>('.bp-vintage')
-    expect(line?.textContent).toBe('Årgång 2024: 3.9 (846 röster)')
+    expect(line?.textContent).toBe('Årgång 2024: 3,9 (846 röster)')
     expect(line?.href).toBe('https://www.vivino.com/wines/24')
   })
 

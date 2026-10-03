@@ -1,3 +1,4 @@
+import '@fontsource/young-serif/latin-400.css'
 import browser from 'webextension-polyfill'
 
 import {
@@ -60,14 +61,16 @@ async function setupStoredData(): Promise<void> {
     'clearRatings',
     countCachedRatings,
     clearRatings,
-    (count) => `${count.toString()} sparade betyg`
+    (count) =>
+      `${count.toLocaleString('sv-SE')} ${count === 1 ? 'sparat betyg' : 'sparade betyg'}`
   )
   await bindCount(
     'pinsCount',
     'clearPins',
     countPinnedMatches,
     clearPinnedMatches,
-    (count) => `${count.toString()} ${count === 1 ? 'eget val' : 'egna val'}`
+    (count) =>
+      `${count.toLocaleString('sv-SE')} ${count === 1 ? 'eget val' : 'egna val'}`
   )
 }
 
@@ -76,6 +79,7 @@ async function setupToggles(): Promise<void> {
   enabledToggle.checked = await featuresEnabled.getValue()
   enabledToggle.addEventListener('change', () => {
     void featuresEnabled.setValue(enabledToggle.checked)
+    syncCategoryToggles(enabledToggle.checked)
   })
 
   const wineToggle = document.getElementById('wine') as HTMLInputElement
@@ -90,6 +94,8 @@ async function setupToggles(): Promise<void> {
     void beerFeatureEnabled.setValue(beerToggle.checked)
   })
 
+  syncCategoryToggles(enabledToggle.checked)
+
   const ciderToggle = document.getElementById('cider') as HTMLInputElement
   ciderToggle.checked = await ciderFeatureEnabled.getValue()
   ciderToggle.addEventListener('change', () => {
@@ -98,19 +104,32 @@ async function setupToggles(): Promise<void> {
 }
 
 async function shareExtension(): Promise<void> {
+  const status = document.getElementById('shareStatus')
   const extensionUrl = 'https://addons.mozilla.org/firefox/addon/bolaget-plus/'
   try {
     await navigator.clipboard.writeText(extensionUrl)
+    if (status) status.textContent = 'Länken är kopierad'
   } catch {
-    //eslint-disable-next-line no-console
-    console.error('Failed to copy extension URL to clipboard')
+    if (status) status.textContent = 'Kunde inte kopiera länken'
   }
+  setTimeout(() => {
+    if (status) status.textContent = ''
+  }, 2500)
 }
 
 function showVersion(): void {
   const versionLabel = document.querySelector('.version')
   if (versionLabel) {
     versionLabel.textContent = `v${version}`
+  }
+}
+
+// The category switches do nothing while everything is off; say so instead of
+// leaving them looking live.
+function syncCategoryToggles(enabled: boolean): void {
+  for (const id of ['wine', 'beer', 'cider']) {
+    const toggle = document.getElementById(id) as HTMLInputElement | null
+    if (toggle) toggle.disabled = !enabled
   }
 }
 

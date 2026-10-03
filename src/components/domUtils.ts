@@ -154,7 +154,18 @@ const STYLES = `
     font-size: 11px;
     font-weight: 400;
   }
+  #${RATING_CONTAINER_ID} :is(a, button):focus-visible,
+  .bp-sort button:focus-visible {
+    outline: 2px solid ${PRIMARY};
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  #${RATING_CONTAINER_ID} :is(.bp-score, .bp-alt-score, .bp-meta, .bp-vintage),
+  .bp-card-rating {
+    font-variant-numeric: tabular-nums;
+  }
   #${RATING_CONTAINER_ID} .bp-text-button {
+    min-height: 24px;
     padding: 0;
     border: 0;
     background: none;
@@ -165,9 +176,14 @@ const STYLES = `
     text-underline-offset: 2px;
     cursor: pointer;
   }
+  #${RATING_CONTAINER_ID} .bp-text-button:hover {
+    text-decoration-thickness: 2px;
+  }
   #${RATING_CONTAINER_ID} .bp-choose {
     flex-shrink: 0;
-    padding: 6px 4px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 4px;
     font-weight: 600;
   }
   #${RATING_CONTAINER_ID} .bp-correction {
@@ -245,6 +261,7 @@ const STYLES = `
     padding: 0 16px 8px;
   }
   .bp-sort button {
+    min-height: 36px;
     padding: 6px 14px;
     border: 1px solid var(--border-strong, #26262640);
     border-radius: 999px;
@@ -253,6 +270,9 @@ const STYLES = `
     font: inherit;
     font-size: 14px;
     cursor: pointer;
+  }
+  .bp-sort button:hover {
+    border-color: ${FG};
   }
   .bp-sort button[aria-pressed='true'] {
     border-color: ${PRIMARY};
@@ -363,7 +383,7 @@ export function setRating(
 
   const meta = document.createElement('div')
   meta.className = 'bp-meta'
-  meta.innerText = `${rating.votes.toString()} ${t('votes')}`
+  meta.innerText = `${formatCount(rating.votes)} ${t('votes')}`
   if (productType !== ProductType.Wine) {
     const beerRating = rating as BeerResponse
     if (beerRating.brewery) {
@@ -446,7 +466,8 @@ export function showLoadingSpinner() {
 function createAlternativeItem(
   productType: ProductType,
   alternative: RatingAlternative,
-  onChoose?: (pick: RatingAlternative) => void
+  onChoose?: (pick: RatingAlternative) => void,
+  reserveThumbnail = false
 ): HTMLElement {
   const item = document.createElement('div')
   item.className = 'bp-alt-item'
@@ -459,6 +480,11 @@ function createAlternativeItem(
 
   if (alternative.imageDataUrl) {
     link.appendChild(createThumbnail(alternative.imageDataUrl, 'bp-alt-thumb'))
+  } else if (reserveThumbnail) {
+    // Keeps the names aligned with the rows that do have a label image.
+    const slot = document.createElement('span')
+    slot.className = 'bp-alt-thumb'
+    link.appendChild(slot)
   }
 
   const name = document.createElement('span')
@@ -473,12 +499,12 @@ function createAlternativeItem(
   }
   const value = document.createElement('span')
   value.textContent =
-    alternative.rating > 0 ? alternative.rating.toString() : 'N/A'
+    alternative.rating > 0 ? formatScore(alternative.rating) : NO_SCORE
   score.appendChild(value)
   if (alternative.votes > 0) {
     const votes = document.createElement('span')
     votes.className = 'bp-alt-votes'
-    votes.textContent = ` (${alternative.votes.toString()})`
+    votes.textContent = ` (${formatCount(alternative.votes)})`
     score.appendChild(votes)
   }
   score.setAttribute('aria-label', ratingLabel(alternative))
@@ -504,8 +530,11 @@ function createAlternativeList(
 ): HTMLElement {
   const list = document.createElement('div')
   list.className = 'bp-alt-list'
+  const anyImage = alternatives.some((alternative) => alternative.imageDataUrl)
   for (const alternative of alternatives) {
-    list.appendChild(createAlternativeItem(productType, alternative, onChoose))
+    list.appendChild(
+      createAlternativeItem(productType, alternative, onChoose, anyImage)
+    )
   }
   return list
 }
@@ -605,9 +634,9 @@ function createVintageLine(
 
   const score = document.createElement('strong')
   if (vintage.rating > 0) {
-    score.textContent = vintage.rating.toString()
+    score.textContent = formatScore(vintage.rating)
     line.appendChild(score)
-    line.append(` (${vintage.votes.toString()} ${t('votes')})`)
+    line.append(` (${formatCount(vintage.votes)} ${t('votes')})`)
   } else {
     score.textContent = t('noRatingYet')
     line.appendChild(score)
@@ -620,9 +649,9 @@ function createVintageLine(
 function ratingLabel(rating: { rating: number; votes: number }): string {
   const score =
     rating.rating > 0
-      ? `${rating.rating.toString()} ${t('of')} 5`
+      ? `${formatScore(rating.rating)} ${t('of')} 5`
       : t('noRatingYet')
-  return `${score}, ${rating.votes.toString()} ${t('votes')}`
+  return `${score}, ${formatCount(rating.votes)} ${t('votes')}`
 }
 
 let zoomPreview: HTMLImageElement | null = null
@@ -815,7 +844,7 @@ export function replaceCardSpinner(
   badge.setAttribute('aria-label', ratingLabel(rating))
   const votes = document.createElement('span')
   votes.className = 'bp-card-votes'
-  votes.textContent = `(${rating.votes.toString()})`
+  votes.textContent = `(${formatCount(rating.votes)})`
   badge.append(
     createRatingIcons(productType, rating.rating),
     createScore(rating.rating, 'bp-card-score'),
@@ -845,16 +874,28 @@ function createRatingIcons(productType: ProductType, score: number): Node {
   return fragment
 }
 
+// Scores and counts the way the Swedish page around them writes numbers:
+// "3,9" and "98 172", not "3.9" and "98172".
+const scoreFormat = new Intl.NumberFormat('sv-SE', {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 1
+})
+const countFormat = new Intl.NumberFormat('sv-SE')
+
+// Shown where the source has too few ratings for a score; the reason is in
+// the title and the screen-reader label.
+const NO_SCORE = '–'
+
 // The score as text. A score of 0 means the source has too few ratings to
 // compute one yet — Vivino withholds the average below about 25 ratings — not
-// that it is rated zero, so it reads "N/A" with the reason on hover.
+// that it is rated zero, so it reads as a dash with the reason on hover.
 function createScore(score: number, className: string): HTMLElement {
   const element = document.createElement('span')
   element.className = className
   if (score > 0) {
-    element.textContent = score.toString()
+    element.textContent = formatScore(score)
   } else {
-    element.textContent = 'N/A'
+    element.textContent = NO_SCORE
     element.title = t('noRatingYet')
   }
   return element
@@ -865,6 +906,14 @@ function createScore(score: number, className: string): HTMLElement {
 // utility class names around it — says what the element is.
 function findCardAnchor(card: Element): Element | null {
   return card.querySelector('[data-slot="product-summary-metadata"]')
+}
+
+function formatCount(count: number): string {
+  return countFormat.format(count)
+}
+
+function formatScore(score: number): string {
+  return scoreFormat.format(score)
 }
 
 function generateStarsSvg(rating: number): string {
