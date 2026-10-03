@@ -178,8 +178,10 @@ h2 {
 
 .data-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  column-gap: 12px;
   min-height: 32px;
   color: var(--fg-muted);
   font-variant-numeric: tabular-nums;
@@ -195,6 +197,29 @@ h2 {
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
+}
+
+.data-actions {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.file-button {
+  display: inline-flex;
+  align-items: center;
+}
+
+.file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.file-button:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .text-button:hover {

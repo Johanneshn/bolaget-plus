@@ -55,6 +55,27 @@
                 <span id="pinsCount"></span>
                 <button type="button" class="text-button" id="clearPins">Rensa</button>
             </div>
+            <div class="data-row">
+                <span id="tastedCount"></span>
+                <span class="data-actions">
+                    <button type="button" class="text-button" id="exportTasted">Exportera</button>
+                    <label class="text-button file-button">
+                        Importera
+                        <input type="file" id="tastedFile" accept=".json,application/json">
+                    </label>
+                    <button type="button" class="text-button" id="clearTasted">Rensa</button>
+                </span>
+            </div>
+            <div class="data-row">
+                <span id="untappdCount"></span>
+                <span class="data-actions">
+                    <label class="text-button file-button">
+                        Importera
+                        <input type="file" id="untappdFile" accept=".json,.csv,application/json,text/csv">
+                    </label>
+                    <button type="button" class="text-button" id="clearUntappd">Rensa</button>
+                </span>
+            </div>
         </section>
 
         <footer class="footer">

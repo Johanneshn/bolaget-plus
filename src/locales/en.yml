@@ -1,10 +1,13 @@
 allVintages: all vintages
 brewery: Brewery
+checkedInOnUntappd: Checked in on Untappd
 choose: Choose
 closestMatches: Closest matches
+hideTasted: Hide tasted
 linkToUntappd: Link to Untappd
 linkToVivino: Link to Vivino
 loading: Loading...
+markTasted: Mark as tasted
 minRating: Minimum rating
 noMatch: Sorry, we could not find any rating for this product.
 noRatingYet: Not enough ratings yet
@@ -16,6 +19,7 @@ searchAtVivino: Search at Vivino
 show: Show
 showAll: All
 sortByRating: Sort by rating
+tasted: Tasted
 uncertainMatch: Could not find an exact match, you can search yourself via the link below.
 undo: Undo
 vintage: Vintage

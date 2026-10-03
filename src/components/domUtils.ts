@@ -1,3 +1,5 @@
+import type { TastedSource } from '@/components/tasted'
+
 import {
   BeerResponse,
   ProductType,
@@ -33,13 +35,61 @@ const STYLES = `
     color: ${FG};
   }
   #${RATING_CONTAINER_ID} .bp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 28px;
     margin-bottom: 8px;
+  }
+  #${RATING_CONTAINER_ID} .bp-label {
     font-family: var(--font-bolaget-medium-condensed, inherit);
     font-size: 13px;
     font-weight: 500;
     letter-spacing: 2px;
     text-transform: uppercase;
     color: ${PRIMARY};
+  }
+  .bp-tasted {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+    padding: 2px 10px;
+    border: 1px solid var(--border-strong, #26262640);
+    border-radius: 999px;
+    background: transparent;
+    color: ${FG};
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .bp-tasted:hover {
+    border-color: ${FG};
+  }
+  .bp-tasted[aria-pressed='true'],
+  .bp-tasted-static {
+    border-color: ${PRIMARY};
+    color: ${PRIMARY};
+    font-weight: 600;
+  }
+  .bp-tasted-static {
+    cursor: default;
+  }
+  .bp-tasted svg,
+  .bp-card-tasted svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+  .bp-card-tasted {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 4px;
+    color: ${PRIMARY};
+    font-size: 12px;
+    font-weight: 600;
   }
   #${RATING_CONTAINER_ID} .bp-rating-row {
     display: flex;
@@ -334,7 +384,12 @@ export function injectRatingContainer() {
 
   const header = document.createElement('div')
   header.className = 'bp-header'
-  header.textContent = 'Bolaget+'
+  const label = document.createElement('span')
+  label.className = 'bp-label'
+  label.textContent = 'Bolaget+'
+  const tasted = document.createElement('div')
+  tasted.className = 'bp-tasted-slot'
+  header.append(label, tasted)
   ratingContainer.appendChild(header)
 
   const bodyDiv = document.createElement('div')
@@ -425,6 +480,37 @@ export function setRating(
 
   const correction = createCorrection(productType, rating, actions)
   if (correction) ratingContainer.appendChild(correction)
+}
+
+// The "Provad" control in the card's header: a toggle for the user's own mark,
+// or — for a beer found in their imported Untappd history — a plain note
+// saying so, since that is not something to undo from here.
+export function setTastedState(
+  source: null | TastedSource,
+  onToggle: (tasted: boolean) => void
+): void {
+  const slot = document.querySelector(`#${RATING_CONTAINER_ID} .bp-tasted-slot`)
+  if (!slot) return
+
+  if (source === 'untappd') {
+    const note = document.createElement('span')
+    note.className = 'bp-tasted bp-tasted-static'
+    note.append(createCheckIcon(), t('checkedInOnUntappd'))
+    slot.replaceChildren(note)
+    return
+  }
+
+  const tasted = source === 'self'
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'bp-tasted'
+  button.setAttribute('aria-pressed', String(tasted))
+  if (tasted) button.appendChild(createCheckIcon())
+  button.append(tasted ? t('tasted') : t('markTasted'))
+  button.addEventListener('click', () => {
+    onToggle(!tasted)
+  })
+  slot.replaceChildren(button)
 }
 
 export function setUncertain(
@@ -552,6 +638,24 @@ function createAlternativeList(
     )
   }
   return list
+}
+
+// A check mark, drawn as SVG (one stroke, the text's colour) rather than a
+// glyph, built node by node so no markup string is involved.
+function createCheckIcon(): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg'
+  const svg = document.createElementNS(ns, 'svg')
+  svg.setAttribute('viewBox', '0 0 24 24')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('stroke', 'currentColor')
+  svg.setAttribute('stroke-width', '2.5')
+  svg.setAttribute('stroke-linecap', 'round')
+  svg.setAttribute('stroke-linejoin', 'round')
+  svg.setAttribute('aria-hidden', 'true')
+  const path = document.createElementNS(ns, 'path')
+  path.setAttribute('d', 'M5 12.5l4.5 4.5L19 7.5')
+  svg.appendChild(path)
+  return svg
 }
 
 // Below a found match: "Ditt val · Ångra" on a match the user picked, or a
@@ -786,6 +890,7 @@ const CARD_INJECTED_SELECTOR = `.${CARD_RATING_CLASS}, .bp-card-spinner-inline`
 // How the user wants a result list shown: sorted by rating, and/or with
 // rated cards below a minimum hidden.
 export interface ListView {
+  hideTasted: boolean
   minRating: number
   sortByRating: boolean
 }
@@ -806,11 +911,10 @@ export function applyListView(list: Element, view: ListView): void {
       'order',
       view.sortByRating && rating > 0 ? String(-Math.round(rating * 100)) : null
     )
-    setStyle(
-      element,
-      'display',
-      rating > 0 && rating < view.minRating ? 'none' : null
-    )
+    const hidden =
+      (rating > 0 && rating < view.minRating) ||
+      (view.hideTasted && tile?.dataset.bpTasted === 'true')
+    setStyle(element, 'display', hidden ? 'none' : null)
   }
 }
 
@@ -860,12 +964,25 @@ export function ensureListControls(
       onChange({ ...view, sortByRating: !view.sortByRating })
     })
 
-    control.append(filter, sort)
+    const hideTasted = document.createElement('button')
+    hideTasted.type = 'button'
+    hideTasted.className = 'bp-hide-tasted'
+    hideTasted.textContent = t('hideTasted')
+    hideTasted.addEventListener('click', () => {
+      const view = readListView(current)
+      onChange({ ...view, hideTasted: !view.hideTasted })
+    })
+
+    control.append(filter, hideTasted, sort)
     list.before(control)
   }
 
   control.dataset.min = String(view.minRating)
   control.dataset.sort = String(view.sortByRating)
+  control.dataset.hideTasted = String(view.hideTasted)
+  control
+    .querySelector('.bp-hide-tasted')
+    ?.setAttribute('aria-pressed', String(view.hideTasted))
   for (const option of control.querySelectorAll<HTMLElement>('[data-min]')) {
     option.setAttribute(
       'aria-pressed',
@@ -896,6 +1013,26 @@ export function injectCardSpinner(
   spinner.setAttribute(CARD_PRODUCT_ATTRIBUTE, productId)
   anchor.insertAdjacentElement('afterend', spinner)
   return spinner
+}
+
+// Marks a list card as tasted ("Provad" under its details) or clears the mark,
+// and records it on the tile for the "Dölj provade" filter.
+export function markCardTasted(card: Element, tasted: boolean): void {
+  ensureStyles()
+  ;(card as HTMLElement).dataset.bpTasted = String(tasted)
+  const existing = card.querySelector('.bp-card-tasted')
+  if (!tasted) {
+    existing?.remove()
+    return
+  }
+  if (existing) return
+  const mark = document.createElement('div')
+  mark.className = 'bp-card-tasted'
+  mark.append(createCheckIcon(), t('tasted'))
+  const after =
+    card.querySelector(`.${CARD_RATING_CLASS}, .bp-card-spinner-inline`) ??
+    findCardAnchor(card)
+  after?.insertAdjacentElement('afterend', mark)
 }
 
 export function replaceCardSpinner(
@@ -948,6 +1085,7 @@ function createRatingIcons(productType: ProductType, score: number): Node {
 
 function readListView(control: HTMLElement): ListView {
   return {
+    hideTasted: control.dataset.hideTasted === 'true',
     minRating: Number(control.dataset.min ?? 0),
     sortByRating: control.dataset.sort === 'true'
   }

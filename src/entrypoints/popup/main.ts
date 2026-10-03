@@ -12,6 +12,15 @@ import {
   featuresEnabled,
   wineFeatureEnabled
 } from '@/components/settings'
+import {
+  clearTasted,
+  clearUntappdBeers,
+  countTasted,
+  countUntappdBeers,
+  exportTasted,
+  importTasted,
+  importUntappdExport
+} from '@/components/tasted'
 
 // Sourced from the manifest, which WXT generates from package.json's version.
 const version = browser.runtime.getManifest().version
@@ -22,10 +31,10 @@ async function bindCount(
   count: () => Promise<number>,
   clear: () => Promise<void>,
   describe: (count: number) => string
-): Promise<void> {
+): Promise<() => Promise<void>> {
   const label = document.getElementById(labelId)
   const button = document.getElementById(buttonId) as HTMLButtonElement | null
-  if (!label || !button) return
+  if (!label || !button) return () => Promise.resolve()
 
   const render = async () => {
     const value = await count()
@@ -36,6 +45,60 @@ async function bindCount(
     void clear().then(render)
   })
   await render()
+  return render
+}
+
+// A file import behind one of the popup's "Importera" labels: Untappd's
+// check-in history (JSON or CSV), or a list of tasted products exported from
+// Bolaget+ on another browser.
+function bindFileImport(
+  inputId: string,
+  importFile: (text: string) => Promise<number>,
+  describe: (count: number) => string,
+  render: () => Promise<void>
+): void {
+  const input = document.getElementById(inputId) as HTMLInputElement | null
+  const status = document.getElementById('shareStatus')
+  // Firefox closes a popup as soon as a file picker opens, taking the import
+  // with it. There, "Importera" opens this page in a tab instead, where the
+  // picker works; the ?tab marker says which of the two this is.
+  if (import.meta.env.FIREFOX && !location.search.includes('tab')) {
+    input?.addEventListener('click', (event) => {
+      event.preventDefault()
+      void browser.tabs.create({
+        url: browser.runtime.getURL('/popup.html?tab')
+      })
+      window.close()
+    })
+    return
+  }
+  input?.addEventListener('change', () => {
+    const file = input.files?.[0]
+    if (!file) return
+    void file
+      .text()
+      .then(importFile)
+      .then(async (count) => {
+        if (status) status.textContent = describe(count)
+        input.value = ''
+        await render()
+      })
+  })
+}
+
+// Downloads the tasted list as a file to keep or import elsewhere.
+function bindTastedExport(): void {
+  document.getElementById('exportTasted')?.addEventListener('click', () => {
+    void exportTasted().then((json) => {
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(
+        new Blob([json], { type: 'application/json' })
+      )
+      link.download = `bolaget-plus-provade-${new Date().toISOString().slice(0, 10)}.json`
+      link.click()
+      URL.revokeObjectURL(link.href)
+    })
+  })
 }
 
 async function initialize(): Promise<void> {
@@ -72,6 +135,39 @@ async function setupStoredData(): Promise<void> {
     (count) =>
       `${count.toLocaleString('sv-SE')} ${count === 1 ? 'eget val' : 'egna val'}`
   )
+  const renderTasted = await bindCount(
+    'tastedCount',
+    'clearTasted',
+    countTasted,
+    clearTasted,
+    (count) => `${count.toLocaleString('sv-SE')} provade`
+  )
+  const renderUntappd = await bindCount(
+    'untappdCount',
+    'clearUntappd',
+    countUntappdBeers,
+    clearUntappdBeers,
+    (count) => `${count.toLocaleString('sv-SE')} öl från Untappd`
+  )
+  bindFileImport(
+    'untappdFile',
+    importUntappdExport,
+    (count) =>
+      count > 0
+        ? `${count.toLocaleString('sv-SE')} öl importerade`
+        : 'Filen är ingen export från Untappd',
+    renderUntappd
+  )
+  bindFileImport(
+    'tastedFile',
+    importTasted,
+    (count) =>
+      count > 0
+        ? `${count.toLocaleString('sv-SE')} provade produkter importerade`
+        : 'Filen är ingen lista från Bolaget+',
+    renderTasted
+  )
+  bindTastedExport()
 }
 
 async function setupToggles(): Promise<void> {
