@@ -40,13 +40,13 @@
     "simple-git-hooks": "^2.13.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.61.1",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "webextension-polyfill": "^0.12.0",
     "wxt": "^0.20.26"
   },
   "dependencies": {
     "@wxt-dev/i18n": "^0.2.5",
-    "@wxt-dev/storage": "^1.2.8",
+    "@wxt-dev/storage": "^1.2.9",
     "sentinel-js": "^0.0.7",
     "string-similarity": "^4.0.4"
   },
@@ -56,12 +56,14 @@
   "pnpm": {
     "//": "Security overrides for vulnerable transitive dev dependencies. Each entry is pinned to the lowest patched version the advisory allows, scoped by major where the tree holds more than one line so unaffected copies keep their own resolution. Drop an entry once the parent package ships a fix of its own.",
     "overrides": {
-      "adm-zip": "^0.6.0",
-      "brace-expansion@1": "^1.1.17",
-      "brace-expansion@5": "^5.0.8",
+      "adm-zip": "^0.6.1",
+      "brace-expansion@1": "^1.1.21",
+      "brace-expansion@5": "^5.0.12",
       "esbuild@>=0.27.0 <0.28.0": "^0.28.1",
-      "js-yaml@4": "^4.3.1",
+      "js-yaml@4": "^4.3.2",
+      "nanoid@3": "^3.3.18",
       "postcss": "^8.5.18",
+      "sharp": "^0.35.4",
       "shell-quote": "^1.10.0",
       "tmp": "^0.2.7",
       "uuid@8": "^11.1.1"
