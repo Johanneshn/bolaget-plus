@@ -287,7 +287,10 @@ export async function fetchRatingFromUntappd(
     // as the collaboration it exists for does. Otherwise they are offered as
     // alternatives, never as the answer: a beer Untappd lacks used to read as
     // not found, and must not become a confident wrong rating instead.
-    const candidates = data.queryAfterRemoval
+    // Algolia echoes queryAfterRemoval on every response; only words it
+    // actually dropped are wrapped in <em>.
+    const loosened = data.queryAfterRemoval?.includes('<em>') ?? false
+    const candidates = loosened
       ? scored.filter((beer) => queryNamesBrewery(productName, beer.brewery))
       : scored
     const bestMatch = candidates.at(0)

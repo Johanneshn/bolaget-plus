@@ -551,6 +551,35 @@ describe('fetchRatingFromUntappd', () => {
     expect(result.link).toContain('/6252924')
   })
 
+  it('takes an ordinary hit as usual although Algolia echoes the query', async () => {
+    // queryAfterRemoval comes with every response; without <em> nothing was
+    // dropped, and the brewery need not be in the title (Somersby is
+    // Carlsberg's).
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            beer_name: 'Somersby Apple Cider',
+            beer_slug: 'carlsberg-group-somersby-apple-cider',
+            bid: 1,
+            brewery_beer_name: 'Carlsberg Group Somersby Apple Cider',
+            brewery_name: 'Carlsberg Group',
+            rating_count: 50000,
+            rating_score: 3.3
+          }
+        ],
+        queryAfterRemoval: 'Somersby Apple Cider'
+      })
+    )
+
+    const result = await fetchRatingFromUntappd(
+      'Somersby Apple Cider',
+      searchConfig
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Found)
+  })
+
   it('never answers with a loosened hit from a brewery the title does not name', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
