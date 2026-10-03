@@ -504,16 +504,24 @@ export function setTastedState(
   }
 
   const tasted = source === 'self'
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.className = 'bp-tasted'
-  button.setAttribute('aria-pressed', String(tasted))
-  if (tasted) button.appendChild(createCheckIcon())
-  button.append(tasted ? t('tasted') : t('markTasted'))
-  button.addEventListener('click', () => {
-    onToggle(!tasted)
-  })
-  slot.replaceChildren(button)
+  // Updated in place when it is already there, so a keyboard or screen-reader
+  // user who just pressed it keeps their focus on it.
+  let button = slot.querySelector<HTMLButtonElement>('button.bp-tasted')
+  if (!button) {
+    button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'bp-tasted'
+    slot.replaceChildren(button)
+  }
+  const current = button
+  current.setAttribute('aria-pressed', String(tasted))
+  current.replaceChildren(
+    ...(tasted ? [createCheckIcon()] : []),
+    tasted ? t('tasted') : t('markTasted')
+  )
+  current.onclick = () => {
+    onToggle(current.getAttribute('aria-pressed') !== 'true')
+  }
 }
 
 export function setUncertain(
@@ -962,6 +970,24 @@ export function applyListView(list: Element, view: ListView): void {
   }
 }
 
+// Clears what a tile carries over from a product it showed before: React can
+// re-render a tile for another product (a new sort, a filter) and keep the
+// element, with our badge, rating and tasted mark still on it. Without this a
+// box wine or a not-found product would keep its predecessor's rating and be
+// sorted, or hidden, as if it were that product.
+export function clearStaleCard(card: Element, productId: string): void {
+  const tile = card as HTMLElement
+  if (tile.dataset.bpProduct === productId) return
+  for (const injected of card.querySelectorAll(
+    `${CARD_INJECTED_SELECTOR}, .bp-card-tasted`
+  )) {
+    injected.remove()
+  }
+  delete tile.dataset.bpRating
+  delete tile.dataset.bpTasted
+  tile.dataset.bpProduct = productId
+}
+
 // The Bolaget+ controls above a result list: "Dölj provade" and "Sortera:
 // Betyg · Prisvärt". Both work through CSS on the grid items rather than by
 // moving or removing them: the list is React's, and React re-renders a list
@@ -970,7 +996,7 @@ export function applyListView(list: Element, view: ListView): void {
 export function ensureListControls(
   list: Element,
   view: ListView,
-  onChange: (view: ListView) => void
+  onChange: (view: ListView, list: Element) => void
 ): void {
   ensureStyles()
   let control = list.previousElementSibling as HTMLElement | null
@@ -978,6 +1004,9 @@ export function ensureListControls(
     control = document.createElement('div')
     control.className = 'bp-sort'
     const current = control
+    // The list is looked up when a control is used, not captured now: the
+    // site may swap the list element out from under a control it keeps.
+    const listOf = () => current.nextElementSibling ?? list
 
     const sort = document.createElement('div')
     sort.className = 'bp-filter'
@@ -998,7 +1027,10 @@ export function ensureListControls(
       // Pressing the active one again turns sorting off.
       option.addEventListener('click', () => {
         const view = readListView(current)
-        onChange({ ...view, sortBy: view.sortBy === sortBy ? 'none' : sortBy })
+        onChange(
+          { ...view, sortBy: view.sortBy === sortBy ? 'none' : sortBy },
+          listOf()
+        )
       })
       sort.appendChild(option)
     }
@@ -1009,7 +1041,7 @@ export function ensureListControls(
     hideTasted.textContent = t('hideTasted')
     hideTasted.addEventListener('click', () => {
       const view = readListView(current)
-      onChange({ ...view, hideTasted: !view.hideTasted })
+      onChange({ ...view, hideTasted: !view.hideTasted }, listOf())
     })
 
     control.append(hideTasted, sort)
@@ -1035,6 +1067,7 @@ export function injectCardSpinner(
   card: Element,
   productId: string
 ): HTMLElement | null {
+  clearStaleCard(card, productId)
   for (const injected of card.querySelectorAll(CARD_INJECTED_SELECTOR)) {
     if (injected.getAttribute(CARD_PRODUCT_ATTRIBUTE) === productId) {
       return null

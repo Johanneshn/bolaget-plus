@@ -101,6 +101,9 @@ export interface UntappdSearchConfig {
 
 export interface UntappdSearchJSON {
   hits?: UntappdHit[]
+  // Present only when Algolia had to drop words to find anything
+  // (removeWordsIfNoResults): the query with the dropped words marked.
+  queryAfterRemoval?: string
 }
 
 // One vintage's Vivino rating. A rating of 0 means Vivino has too few ratings

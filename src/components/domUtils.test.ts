@@ -8,11 +8,14 @@ import {
 } from '@/@types/types'
 import {
   applyListView,
+  clearStaleCard,
   ensureListControls,
   injectCardSpinner,
+  injectRatingContainer,
   markCardTasted,
   replaceCardSpinner,
   setRating,
+  setTastedState,
   setUncertain,
   valueScores
 } from '@/components/domUtils'
@@ -355,5 +358,35 @@ describe('tasted products', () => {
     expect(card.querySelector('.bp-card-tasted')?.textContent).toBe('Provad')
     markCardTasted(card, false)
     expect(card.querySelector('.bp-card-tasted')).toBeNull()
+  })
+})
+
+describe('a tile reused for another product', () => {
+  it("drops the previous product's badge, rating and tasted mark", () => {
+    const card = renderCard('203701')
+    clearStaleCard(card, '203701')
+    badge(card, 4.2, 100)
+    markCardTasted(card, true)
+
+    clearStaleCard(card, '999999')
+
+    const tile = card as HTMLElement
+    expect(tile.dataset.bpRating).toBeUndefined()
+    expect(tile.dataset.bpTasted).toBeUndefined()
+    expect(card.querySelector('.bp-card-rating, .bp-card-tasted')).toBeNull()
+  })
+})
+
+describe('the tasted toggle', () => {
+  it('keeps the same button, and so the focus, when toggled', () => {
+    document.body.innerHTML = '<main><h1><span>Amadio</span></h1></main>'
+    injectRatingContainer()
+    setTastedState(null, () => undefined)
+    const before = document.querySelector('.bp-tasted')
+    setTastedState('self', () => undefined)
+
+    expect(document.querySelector('.bp-tasted')).toBe(before)
+    expect(before?.getAttribute('aria-pressed')).toBe('true')
+    expect(before?.textContent).toBe('Provad')
   })
 })
