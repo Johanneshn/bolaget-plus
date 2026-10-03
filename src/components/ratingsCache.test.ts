@@ -8,6 +8,13 @@ import {
   RatingResultStatus
 } from '@/@types/types'
 import {
+  countPinnedMatches,
+  getPinnedRating,
+  pinMatch
+} from '@/components/pinnedMatches'
+import {
+  clearRatings,
+  countCachedRatings,
   removeExpiredRatings,
   saveRating,
   tryGetRating
@@ -205,5 +212,30 @@ describe('ratingsCache', () => {
 
     await removeExpiredRatings()
     await expect(storedKeys()).resolves.toEqual([])
+  })
+})
+
+describe('clearing the cache from the popup', () => {
+  beforeEach(() => {
+    fakeBrowser.reset()
+  })
+
+  it("counts and clears cached ratings, but keeps the user's picks", async () => {
+    await saveRating(request, rating)
+    await saveRating({ ...request, productId: '456' }, rating)
+    await pinMatch('123', {
+      link: 'https://www.vivino.com/wines/2',
+      name: 'The Right Wine',
+      rating: 3.7,
+      votes: 55
+    })
+
+    expect(await countCachedRatings()).toBe(2)
+    await clearRatings()
+
+    expect(await countCachedRatings()).toBe(0)
+    expect(await tryGetRating(request)).toBeNull()
+    expect(await countPinnedMatches()).toBe(1)
+    expect(await getPinnedRating('123')).not.toBeNull()
   })
 })

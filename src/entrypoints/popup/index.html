@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sv">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="manifest.type" content="browser_action" />
-    <title>Settings</title>
+    <title>Inställningar</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -58,16 +58,26 @@
                     </label>
                 </div> -->
             </div>
+            <div class="data">
+                <div class="data-row">
+                    <span id="ratingsCount"></span>
+                    <button type="button" class="text-button" id="clearRatings">Töm</button>
+                </div>
+                <div class="data-row">
+                    <span id="pinsCount"></span>
+                    <button type="button" class="text-button" id="clearPins">Rensa</button>
+                </div>
+            </div>
             <div class="footer">
                 <span class="version">v1.0.0</span>
                 <a href="https://u24.gov.ua/" target="_blank" rel="noopener noreferrer" class="donate-link">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path>
                     </svg>
-                    Donate
+                    Donera
                 </a>
                 <a href="https://github.com/BroadcastDivers/bolaget-plus/issues" target="_blank" rel="noopener noreferrer" class="donate-link">
-                    Report an issue
+                    Rapportera fel
                 </a>
             </div>
         </div>
