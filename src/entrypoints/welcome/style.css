@@ -1,0 +1,136 @@
+/* The welcome page shares the popup's world — bottle-green ground, the name
+   in Young Serif, the system sans for reading — and is laid out to be read:
+   one column, a comfortable measure, the features as a definition list
+   rather than a grid of look-alike cards. */
+:root {
+  --bg: #12201b;
+  --fg: #f3efe6;
+  --fg-muted: #b9c2bc;
+  --line: #2e4239;
+  --accent: #4fbf8a;
+  --focus: #f3d37a;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  color: var(--fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.welcome {
+  max-width: 64ch;
+  margin: 0 auto;
+  padding: clamp(32px, 8vw, 88px) 20px 64px;
+}
+
+h1 {
+  margin: 0;
+  font-family: 'Young Serif', Georgia, serif;
+  font-size: clamp(44px, 9vw, 72px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.plus {
+  color: var(--accent);
+}
+
+.lede {
+  margin: 20px 0 0;
+  color: var(--fg-muted);
+  font-size: 20px;
+  text-wrap: pretty;
+}
+
+section {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+h2 {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+dl {
+  margin: 0;
+}
+
+dt {
+  margin-top: 20px;
+  font-weight: 600;
+}
+
+dd {
+  margin: 4px 0 0;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+
+em {
+  color: var(--fg);
+  font-style: normal;
+  font-weight: 600;
+}
+
+footer {
+  margin-top: 64px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+
+footer p {
+  margin: 16px 0 0;
+  color: var(--fg-muted);
+  font-size: 15px;
+}
+
+.primary {
+  display: inline-block;
+  padding: 12px 22px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 150ms ease-out;
+}
+
+.primary:hover {
+  background: #7ad6a8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
