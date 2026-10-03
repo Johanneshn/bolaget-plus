@@ -1,5 +1,12 @@
+import type { Page } from '@playwright/test'
+
 import { expect, test } from './fixtures'
 import { openPage, RATING_TIMEOUT } from './systembolaget'
+
+// Mirrors productUtils.ts. Copied rather than imported: the e2e suite runs
+// outside the WXT build, without its auto-imports and #i18n alias.
+const CARD_TILE_SELECTOR = '[data-slot="product-tile"]'
+const CARD_LINK_SELECTOR = 'a[data-slot="product-tile-action"]'
 
 // These tests drive the live Systembolaget site, so they break when it changes.
 // They run in the nightly smoke workflow, not in CI — see playwright.config.ts.
@@ -143,17 +150,39 @@ test('visiting a wine page shows rating-container with ratings and stars', async
   await expect(vivinoLink).toBeVisible()
 })
 
-test('visiting wine list page shows rating badges on product cards', async ({
-  extensionId,
-  page
-}) => {
-  await page.goto(`chrome-extension://${extensionId}/popup.html`)
-  await page.waitForSelector('.settings')
-  await expect(page.locator('#enabled')).toBeChecked()
-  await expect(page.locator('#wine')).toBeChecked()
+// A list card is found by its data-slot names; when Systembolaget renames
+// them (as it did in October 2026, when the old a[id^="tile:"] links went),
+// every list test would otherwise just time out waiting for a badge. Asserting
+// the markup first turns that into a failure that says what changed.
+async function expectProductTiles(page: Page): Promise<void> {
+  await expect(
+    page.locator(CARD_TILE_SELECTOR).first(),
+    `No ${CARD_TILE_SELECTOR} on the list page: Systembolaget has likely changed its card markup, which productUtils.ts reads`
+  ).toBeVisible({ timeout: RATING_TIMEOUT })
+  await expect(
+    page.locator(`${CARD_TILE_SELECTOR} ${CARD_LINK_SELECTOR}`).first(),
+    `No ${CARD_LINK_SELECTOR} inside a product tile: the card's title link has changed`
+  ).toBeVisible()
+}
 
-  await openPage(page, 'https://www.systembolaget.se/sortiment/vin/')
+for (const [label, path, toggle] of [
+  ['wine', '/sortiment/vin/', '#wine'],
+  ['beer', '/sortiment/ol/', '#beer'],
+  ['cider', '/sortiment/cider-blanddrycker/', '#cider']
+] as const) {
+  test(`visiting the ${label} list page shows rating badges on product cards`, async ({
+    extensionId,
+    page
+  }) => {
+    await page.goto(`chrome-extension://${extensionId}/popup.html`)
+    await page.waitForSelector('.settings')
+    await expect(page.locator('#enabled')).toBeChecked()
+    await expect(page.locator(toggle)).toBeChecked()
 
-  await page.waitForSelector('.bp-card-rating', { timeout: RATING_TIMEOUT })
-  await expect(page.locator('.bp-card-rating').first()).toBeVisible()
-})
+    await openPage(page, `https://www.systembolaget.se${path}`)
+    await expectProductTiles(page)
+
+    await page.waitForSelector('.bp-card-rating', { timeout: RATING_TIMEOUT })
+    await expect(page.locator('.bp-card-rating').first()).toBeVisible()
+  })
+}
