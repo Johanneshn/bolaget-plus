@@ -5,6 +5,7 @@ closestMatches: Närmaste träffar
 linkToUntappd: Länk till Untappd
 linkToVivino: Länk till Vivino
 loading: Laddar...
+minRating: Lägsta betyg
 noMatch: Tyvärr, vi kunde inte hitta något betyg för denna produkt.
 noRatingYet: Inte tillräckligt många betyg än
 notOnBottle: Vinet är inte på flaska
@@ -12,6 +13,8 @@ of: av
 rating: Betyg
 searchAtUntappd: Sök hos Untappd
 searchAtVivino: Sök hos Vivino
+show: Visa
+showAll: Alla
 sortByRating: Sortera på betyg
 uncertainMatch: Kunde inte hitta en exakt matchning, du kan själv söka via länken nedan.
 undo: Ångra

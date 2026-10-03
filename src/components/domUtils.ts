@@ -257,8 +257,22 @@ const STYLES = `
   }
   .bp-sort {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: flex-end;
+    gap: 8px 16px;
     padding: 0 16px 8px;
+    color: ${FG};
+    font-size: 14px;
+  }
+  .bp-filter {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .bp-filter span {
+    margin-right: 4px;
+    color: ${MUTED_FG};
   }
   .bp-sort button {
     min-height: 36px;
@@ -269,6 +283,7 @@ const STYLES = `
     color: ${FG};
     font: inherit;
     font-size: 14px;
+    font-variant-numeric: tabular-nums;
     cursor: pointer;
   }
   .bp-sort button:hover {
@@ -768,41 +783,98 @@ const CARD_RATING_CLASS = 'bp-card-rating'
 const CARD_PRODUCT_ATTRIBUTE = 'data-bp-product'
 const CARD_INJECTED_SELECTOR = `.${CARD_RATING_CLASS}, .bp-card-spinner-inline`
 
-// Orders the list's items by their badge, best first; unrated ones (not
-// loaded yet, not on Vivino, boxes) keep their place after them.
-export function applyRatingOrder(list: Element, active: boolean): void {
+// How the user wants a result list shown: sorted by rating, and/or with
+// rated cards below a minimum hidden.
+export interface ListView {
+  minRating: number
+  sortByRating: boolean
+}
+
+// The minimum-rating choices offered; 0 shows every card.
+const MIN_RATING_OPTIONS = [0, 3.5, 4] as const
+
+// Applies a ListView to a result list. Unrated cards — not looked up yet, not
+// on Vivino or Untappd, boxes, too few ratings — are never hidden (no rating is
+// not a bad rating) and, when sorting, keep their place after the rated ones.
+export function applyListView(list: Element, view: ListView): void {
   for (const item of list.children) {
     const tile = item.querySelector<HTMLElement>('[data-slot="product-tile"]')
     const rating = Number(tile?.dataset.bpRating ?? 0)
-    ;(item as HTMLElement).style.order =
-      active && rating > 0 ? String(-Math.round(rating * 100)) : ''
+    const element = item as HTMLElement
+    setStyle(
+      element,
+      'order',
+      view.sortByRating && rating > 0 ? String(-Math.round(rating * 100)) : null
+    )
+    setStyle(
+      element,
+      'display',
+      rating > 0 && rating < view.minRating ? 'none' : null
+    )
   }
 }
 
-// "Sortera på betyg" above a result list. Sorting is CSS `order` on the grid
-// items, not moving them: the list is React's, and React re-renders a list
-// whose nodes were moved behind its back into the wrong order or an error.
-// Turning it off clears the order and the list is the site's again.
-export function ensureSortControl(
+// The Bolaget+ controls above a result list: "Visa: Alla · 3,5+ · 4,0+" and
+// "Sortera på betyg". Both work through CSS on the grid items rather than by
+// moving or removing them: the list is React's, and React re-renders a list
+// whose nodes were changed behind its back into the wrong order or an error.
+// Setting both back hands the list to the site unchanged.
+export function ensureListControls(
   list: Element,
-  active: boolean,
-  onToggle: (active: boolean) => void
+  view: ListView,
+  onChange: (view: ListView) => void
 ): void {
   ensureStyles()
-  let control = list.previousElementSibling
+  let control = list.previousElementSibling as HTMLElement | null
   if (!control?.classList.contains('bp-sort')) {
     control = document.createElement('div')
     control.className = 'bp-sort'
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.textContent = t('sortByRating')
-    button.addEventListener('click', () => {
-      onToggle(button.getAttribute('aria-pressed') !== 'true')
+    const current = control
+
+    const filter = document.createElement('div')
+    filter.className = 'bp-filter'
+    filter.setAttribute('role', 'group')
+    filter.setAttribute('aria-label', t('minRating'))
+    const label = document.createElement('span')
+    label.textContent = `${t('show')}:`
+    label.setAttribute('aria-hidden', 'true')
+    filter.appendChild(label)
+    for (const minRating of MIN_RATING_OPTIONS) {
+      const option = document.createElement('button')
+      option.type = 'button'
+      option.dataset.min = String(minRating)
+      option.textContent =
+        minRating === 0 ? t('showAll') : `${formatScore(minRating)}+`
+      option.addEventListener('click', () => {
+        onChange({ ...readListView(current), minRating })
+      })
+      filter.appendChild(option)
+    }
+
+    const sort = document.createElement('button')
+    sort.type = 'button'
+    sort.className = 'bp-sort-toggle'
+    sort.textContent = t('sortByRating')
+    sort.addEventListener('click', () => {
+      const view = readListView(current)
+      onChange({ ...view, sortByRating: !view.sortByRating })
     })
-    control.appendChild(button)
+
+    control.append(filter, sort)
     list.before(control)
   }
-  control.querySelector('button')?.setAttribute('aria-pressed', String(active))
+
+  control.dataset.min = String(view.minRating)
+  control.dataset.sort = String(view.sortByRating)
+  for (const option of control.querySelectorAll<HTMLElement>('[data-min]')) {
+    option.setAttribute(
+      'aria-pressed',
+      String(Number(option.dataset.min) === view.minRating)
+    )
+  }
+  control
+    .querySelector('.bp-sort-toggle')
+    ?.setAttribute('aria-pressed', String(view.sortByRating))
 }
 
 export function injectCardSpinner(
@@ -872,6 +944,28 @@ function createRatingIcons(productType: ProductType, score: number): Node {
     ...new DOMParser().parseFromString(markup, 'text/html').body.childNodes
   )
   return fragment
+}
+
+function readListView(control: HTMLElement): ListView {
+  return {
+    minRating: Number(control.dataset.min ?? 0),
+    sortByRating: control.dataset.sort === 'true'
+  }
+}
+
+// Sets or clears one inline style property, dropping the style attribute once
+// it is empty, so an element of React's is left exactly as React rendered it.
+function setStyle(
+  element: HTMLElement,
+  property: string,
+  value: null | string
+): void {
+  if (value === null) {
+    element.style.removeProperty(property)
+    if (!element.getAttribute('style')) element.removeAttribute('style')
+  } else {
+    element.style.setProperty(property, value)
+  }
 }
 
 // Scores and counts the way the Swedish page around them writes numbers:

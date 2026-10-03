@@ -43,7 +43,7 @@ export default defineContentScript({
     sentinel.on(productUtils.CARD_LINK_SELECTOR, (link) => {
       const card = productUtils.getCard(link)
       listCardObserver.observe(card)
-      addSortControl(card)
+      addListControls(card)
     })
   },
   matches: ['*://*.systembolaget.se/*']
@@ -103,23 +103,23 @@ async function handleListCard(card: Element) {
   })
   domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
   const list = card.closest('ul')
-  if (sortByRating && list) domUtils.applyRatingOrder(list, true)
+  if (list) domUtils.applyListView(list, listView)
 }
 
-// Whether result lists are sorted by rating. Kept for the tab's lifetime, so
-// it carries over to the next page of results.
-let sortByRating = false
+// How result lists are shown (sorted, filtered). Kept for the tab's lifetime,
+// so it carries over to the next page of results.
+let listView: domUtils.ListView = { minRating: 0, sortByRating: false }
 
-function addSortControl(card: Element) {
+function addListControls(card: Element) {
   const list = card.closest('ul')
   if (!list) return
-  domUtils.ensureSortControl(list, sortByRating, (active) => {
-    sortByRating = active
-    domUtils.ensureSortControl(list, active, () => undefined)
-    domUtils.applyRatingOrder(list, active)
-    // Cards are only looked up once scrolled into view; a sort needs them
-    // all. The fetch queue paces the lookups as usual.
-    if (active) {
+  domUtils.ensureListControls(list, listView, (view) => {
+    listView = view
+    domUtils.ensureListControls(list, view, () => undefined)
+    domUtils.applyListView(list, view)
+    // Cards are only looked up once scrolled into view; sorting or filtering
+    // needs them all. The fetch queue paces the lookups as usual.
+    if (view.sortByRating || view.minRating > 0) {
       for (const link of list.querySelectorAll(
         productUtils.CARD_LINK_SELECTOR
       )) {
@@ -127,6 +127,7 @@ function addSortControl(card: Element) {
       }
     }
   })
+  domUtils.applyListView(list, listView)
 }
 
 function handleRating(

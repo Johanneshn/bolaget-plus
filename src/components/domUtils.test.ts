@@ -7,6 +7,8 @@ import {
   RatingResultStatus
 } from '@/@types/types'
 import {
+  applyListView,
+  ensureListControls,
   injectCardSpinner,
   replaceCardSpinner,
   setRating,
@@ -211,5 +213,80 @@ describe('correcting a match', () => {
 
     document.querySelector<HTMLButtonElement>('.bp-choose')?.click()
     expect(chosen).toEqual([runnerUp])
+  })
+})
+
+describe('sorting and filtering a result list', () => {
+  function renderList(ratings: (null | number)[]): HTMLUListElement {
+    document.body.innerHTML = `<ul>${ratings
+      .map(
+        (rating, index) =>
+          `<li id="item-${index.toString()}"><div data-slot="product-tile"${
+            rating === null ? '' : ` data-bp-rating="${rating.toString()}"`
+          }></div></li>`
+      )
+      .join('')}</ul>`
+    const list = document.querySelector('ul')
+    if (!list) throw new Error('list not rendered')
+    return list
+  }
+
+  function item(index: number): HTMLElement {
+    const element = document.getElementById(`item-${index.toString()}`)
+    if (!element) throw new Error('item not rendered')
+    return element
+  }
+
+  it('hides rated cards below the minimum but never unrated ones', () => {
+    const list = renderList([4.2, 3.4, null, 3.6])
+    applyListView(list, { minRating: 3.5, sortByRating: false })
+
+    expect(item(0).style.display).toBe('')
+    expect(item(1).style.display).toBe('none')
+    expect(item(2).style.display).toBe('')
+    expect(item(3).style.display).toBe('')
+  })
+
+  it('orders rated cards best first and leaves unrated ones after them', () => {
+    const list = renderList([3.6, null, 4.2])
+    applyListView(list, { minRating: 0, sortByRating: true })
+
+    expect(Number(item(2).style.order)).toBeLessThan(
+      Number(item(0).style.order)
+    )
+    expect(item(1).style.order).toBe('')
+  })
+
+  it('hands the list back unchanged when both are turned off', () => {
+    const list = renderList([3.4, 4.2])
+    applyListView(list, { minRating: 4, sortByRating: true })
+    applyListView(list, { minRating: 0, sortByRating: false })
+
+    expect(item(0).hasAttribute('style')).toBe(false)
+    expect(item(1).hasAttribute('style')).toBe(false)
+  })
+
+  it('reports the chosen minimum and sort from its controls', () => {
+    const list = renderList([4.2])
+    const changes: unknown[] = []
+    ensureListControls(list, { minRating: 0, sortByRating: false }, (view) =>
+      changes.push(view)
+    )
+
+    const buttons = [
+      ...document.querySelectorAll<HTMLButtonElement>('.bp-sort button')
+    ]
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      'Alla',
+      '3,5+',
+      '4,0+',
+      'Sortera på betyg'
+    ])
+    buttons[2].click()
+    buttons[3].click()
+    expect(changes).toEqual([
+      { minRating: 4, sortByRating: false },
+      { minRating: 0, sortByRating: true }
+    ])
   })
 })
