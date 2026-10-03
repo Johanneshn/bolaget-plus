@@ -1,5 +1,3 @@
-import { i18n } from '#i18n'
-
 import {
   BeerResponse,
   ProductType,
@@ -8,6 +6,7 @@ import {
   RatingResultStatus
 } from '@/@types/types'
 import { getCardProductId } from '@/components/productUtils'
+import { t } from '@/components/strings'
 
 const RATING_CONTAINER_ID = 'rating-container'
 const RATING_CONTAINER_BODY_ID = 'rating-container-body'
@@ -228,7 +227,19 @@ const STYLES = `
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-top: 4px;
+    width: fit-content;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  /* Tinted by how good the rating is, so a list can be skimmed: green from
+     4.0 (the top tier on both Vivino and Untappd), grey from 3.5, none
+     below. */
+  .bp-card-rating[data-tier='high'] {
+    background: color-mix(in srgb, ${PRIMARY} 14%, transparent);
+  }
+  .bp-card-rating[data-tier='mid'] {
+    background: ${MUTED_BG};
   }
   .bp-card-rating svg { width: 14px; height: 14px; }
   .bp-card-rating .bp-card-score {
@@ -298,6 +309,12 @@ export function injectRatingContainer() {
   ensureStyles()
 }
 
+export function ratingTier(score: number): 'high' | 'low' | 'mid' {
+  if (score >= 4) return 'high'
+  if (score >= 3.5) return 'mid'
+  return 'low'
+}
+
 export function setMessage(message: string) {
   const ratingContainer = document.getElementById(RATING_CONTAINER_BODY_ID)
   if (!ratingContainer) {
@@ -325,13 +342,13 @@ export function setRating(
     rating.rating > 0
       ? `<span class="bp-score">${rating.rating.toString()}</span>
         <span class="bp-scale">/ 5</span>`
-      : `<span class="bp-score" title="${i18n.t('noRatingYet')}">N/A</span>`
+      : `<span class="bp-score" title="${t('noRatingYet')}">N/A</span>`
 
   const ratingRow = document.createElement('div')
   ratingRow.className = 'bp-rating-row'
   ratingRow.innerHTML = `
-        ${svg}
-        ${scoreHtml}
+        <span class="bp-stars" role="img" aria-label="${ratingLabel(rating)}">${svg}</span>
+        <span aria-hidden="true">${scoreHtml}</span>
       `
   if (rating.imageDataUrl) {
     ratingRow.prepend(createThumbnail(rating.imageDataUrl, 'bp-thumb'))
@@ -339,7 +356,7 @@ export function setRating(
 
   const meta = document.createElement('div')
   meta.className = 'bp-meta'
-  meta.innerText = `${rating.votes.toString()} ${i18n.t('votes')}`
+  meta.innerText = `${rating.votes.toString()} ${t('votes')}`
   if (productType !== ProductType.Wine) {
     const beerRating = rating as BeerResponse
     if (beerRating.brewery) {
@@ -348,9 +365,7 @@ export function setRating(
   }
 
   const linkLabel =
-    productType === ProductType.Wine
-      ? i18n.t('linkToVivino')
-      : i18n.t('linkToUntappd')
+    productType === ProductType.Wine ? t('linkToVivino') : t('linkToUntappd')
 
   const footer = document.createElement('div')
   footer.className = 'bp-footer'
@@ -362,7 +377,7 @@ export function setRating(
   const vintage = createVintageLine(rating, vintageYear)
   if (vintage) {
     // Two vote counts on one card need telling apart.
-    meta.innerText += ` · ${i18n.t('allVintages')}`
+    meta.innerText += ` · ${t('allVintages')}`
     ratingContainer.appendChild(vintage)
   }
 
@@ -381,9 +396,7 @@ export function setUncertain(
   const message = document.createElement('div')
   message.className = 'bp-message'
   message.innerText =
-    alternatives.length > 0
-      ? `${i18n.t('closestMatches')}:`
-      : i18n.t('uncertainMatch')
+    alternatives.length > 0 ? `${t('closestMatches')}:` : t('uncertainMatch')
   ratingContainer.appendChild(message)
 
   if (alternatives.length > 0) {
@@ -394,8 +407,8 @@ export function setUncertain(
 
   const linkLabel =
     productType === ProductType.Wine
-      ? i18n.t('searchAtVivino')
-      : i18n.t('searchAtUntappd')
+      ? t('searchAtVivino')
+      : t('searchAtUntappd')
 
   const footer = document.createElement('div')
   footer.className = 'bp-footer'
@@ -412,7 +425,7 @@ export function showLoadingSpinner() {
   spinner.className = 'bp-spinner-wrap'
   spinner.innerHTML = `
       <div class="bp-spinner"></div>
-      <span class="bp-message">${i18n.t('loading')}</span>
+      <span class="bp-message">${t('loading')}</span>
     `
 
   ratingContainer.appendChild(spinner)
@@ -441,7 +454,7 @@ function createAlternativeItem(
 
   const name = document.createElement('span')
   name.className = 'bp-alt-name'
-  name.textContent = `${alternative.name} ↗`
+  name.textContent = alternative.name
 
   const score = document.createElement('span')
   score.className = 'bp-alt-score'
@@ -469,7 +482,7 @@ function createAlternativeItem(
   item.appendChild(link)
 
   if (onChoose) {
-    const choose = createTextButton(i18n.t('choose'), () => {
+    const choose = createTextButton(t('choose'), () => {
       onChoose(alternative)
     })
     choose.classList.add('bp-choose')
@@ -504,8 +517,8 @@ function createCorrection(
 
   if (rating.pinned) {
     if (!onUndo) return null
-    row.append(`${i18n.t('yourPick')} · `)
-    row.appendChild(createTextButton(i18n.t('undo'), onUndo))
+    row.append(`${t('yourPick')} · `)
+    row.appendChild(createTextButton(t('undo'), onUndo))
     return row
   }
 
@@ -514,7 +527,7 @@ function createCorrection(
 
   const list = createAlternativeList(productType, alternatives, onChoose)
   list.hidden = true
-  const toggle = createTextButton(i18n.t('wrongMatch'), () => {
+  const toggle = createTextButton(t('wrongMatch'), () => {
     list.hidden = !list.hidden
     toggle.setAttribute('aria-expanded', String(!list.hidden))
   })
@@ -536,10 +549,6 @@ function createSourceLink(
   linkElement.target = '_blank'
   linkElement.rel = 'noopener noreferrer'
   linkElement.append(label)
-  linkElement.insertAdjacentHTML(
-    'beforeend',
-    `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`
-  )
   return linkElement
 }
 
@@ -585,16 +594,16 @@ function createVintageLine(
   line.rel = 'noopener noreferrer'
 
   const label = document.createElement('span')
-  label.textContent = `${i18n.t('vintage')} ${vintage.year}: `
+  label.textContent = `${t('vintage')} ${vintage.year}: `
   line.appendChild(label)
 
   const score = document.createElement('strong')
   if (vintage.rating > 0) {
     score.textContent = vintage.rating.toString()
     line.appendChild(score)
-    line.append(` (${vintage.votes.toString()} ${i18n.t('votes')})`)
+    line.append(` (${vintage.votes.toString()} ${t('votes')})`)
   } else {
-    score.textContent = i18n.t('noRatingYet')
+    score.textContent = t('noRatingYet')
     line.appendChild(score)
   }
   return line
@@ -605,9 +614,9 @@ function createVintageLine(
 function ratingLabel(rating: { rating: number; votes: number }): string {
   const score =
     rating.rating > 0
-      ? `${rating.rating.toString()} ${i18n.t('of')} 5`
-      : i18n.t('noRatingYet')
-  return `${score}, ${rating.votes.toString()} ${i18n.t('votes')}`
+      ? `${rating.rating.toString()} ${t('of')} 5`
+      : t('noRatingYet')
+  return `${score}, ${rating.votes.toString()} ${t('votes')}`
 }
 
 let zoomPreview: HTMLImageElement | null = null
@@ -763,6 +772,9 @@ export function replaceCardSpinner(
   const badge = document.createElement('div')
   badge.className = CARD_RATING_CLASS
   badge.setAttribute(CARD_PRODUCT_ATTRIBUTE, productId)
+  badge.dataset.tier = ratingTier(rating.rating)
+  badge.setAttribute('role', 'img')
+  badge.setAttribute('aria-label', ratingLabel(rating))
   badge.innerHTML = `
     ${svg}
     ${cardScoreHtml(rating.rating)}
@@ -782,7 +794,7 @@ export function replaceCardSpinner(
 function cardScoreHtml(score: number): string {
   return score > 0
     ? `<span class="bp-card-score">${score.toString()}</span>`
-    : `<span class="bp-card-score" title="${i18n.t('noRatingYet')}">N/A</span>`
+    : `<span class="bp-card-score" title="${t('noRatingYet')}">N/A</span>`
 }
 
 // The line a card's badge goes under: the "750 ml · 13 % vol. · Nr 223701"

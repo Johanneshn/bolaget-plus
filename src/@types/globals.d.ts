@@ -9,3 +9,8 @@
 //   votes: number;
 //   link: string | null;
 // }
+
+declare module '*.yml?raw' {
+  const content: string
+  export default content
+}
