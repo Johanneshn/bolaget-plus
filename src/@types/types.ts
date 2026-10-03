@@ -101,8 +101,8 @@ export interface UntappdSearchConfig {
 
 export interface UntappdSearchJSON {
   hits?: UntappdHit[]
-  // Present only when Algolia had to drop words to find anything
-  // (removeWordsIfNoResults): the query with the dropped words marked.
+  // The query as Algolia finally ran it (with removeWordsIfNoResults). Sent on
+  // every response; the words it had to drop to find anything are in <em>.
   queryAfterRemoval?: string
 }
 
