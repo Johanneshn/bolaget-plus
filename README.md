@@ -1,6 +1,6 @@
 # Bolaget+
 
-[![GitHub Release](https://img.shields.io/github/release/BroadcastDivers/bolaget-plus.svg?style=flat)]() [![CI](https://github.com/BroadcastDivers/bolaget-plus/actions/workflows/ci.yaml/badge.svg?branch=main&event=push)](https://github.com/BroadcastDivers/bolaget-plus/actions/workflows/ci.yaml)
+[![GitHub Release](https://img.shields.io/github/release/Johanneshn/bolaget-plus.svg?style=flat)]() [![CI](https://github.com/Johanneshn/bolaget-plus/actions/workflows/ci.yaml/badge.svg?branch=main&event=push)](https://github.com/Johanneshn/bolaget-plus/actions/workflows/ci.yaml)
 
 A browser plugin for Systembolaget.se that shows ratings directly at systembolagets website!
 
@@ -21,7 +21,7 @@ A browser plugin for Systembolaget.se that shows ratings directly at systembolag
 
 [![Download Firefox Extension](https://img.shields.io/badge/Download-Firefox%20Extension-orange?logo=firefox)](https://addons.mozilla.org/firefox/addon/bolaget-plus) [![Download Chrome Extension](https://img.shields.io/badge/Download-Chrome%20Extension-blue?logo=google-chrome)](https://chromewebstore.google.com/detail/bolaget-plus/bbjfkhmnofhindccdlfmhkibfafiogao)
 
-Or download the latest zip from the [Github Releases](https://github.com/BroadcastDivers/bolaget-plus/releases) page and install it in your browser.
+Or download the latest zip from the [Github Releases](https://github.com/Johanneshn/bolaget-plus/releases) page and install it in your browser.
 
 ## Usage
 
