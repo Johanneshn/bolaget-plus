@@ -96,7 +96,11 @@ function bindTastedExport(): void {
       )
       link.download = `bolaget-plus-provade-${new Date().toISOString().slice(0, 10)}.json`
       link.click()
-      URL.revokeObjectURL(link.href)
+      // Firefox can still be reading the blob when click() returns; revoking
+      // it at once can fail the download.
+      setTimeout(() => {
+        URL.revokeObjectURL(link.href)
+      }, 10_000)
     })
   })
 }

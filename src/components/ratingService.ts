@@ -109,7 +109,10 @@ function isMissingImages(rating: RatingResponse, type: ProductType): boolean {
     return false
   }
   if (rating.status === RatingResultStatus.Found) {
-    return !rating.imageDataUrl
+    // An entry cached before vintages and runners-up were fetched has a
+    // thumbnail but neither; refetch it rather than show the product page
+    // without its vintage line and "Fel träff?" until the entry expires.
+    return !rating.imageDataUrl || rating.vintages === undefined
   }
   return rating.alternatives?.some((a) => !a.imageDataUrl) ?? false
 }

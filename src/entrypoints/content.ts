@@ -82,6 +82,7 @@ async function handleListCard(card: Element) {
   const productId = productUtils.getCardProductId(card)
   const name = productUtils.getCardName(card)
   if (!productId || !name) return
+  domUtils.clearStaleCard(card, productId)
   await markCardTasted(card, productId)
 
   // Vivino only rates bottled wine, same as on the product page — leave the
@@ -117,6 +118,8 @@ async function markCardTasted(
   untappdLink?: null | string
 ) {
   const source = await getTastedSource(productId, untappdLink)
+  // A lookup can finish after the tile has moved on to another product.
+  if (productUtils.getCardProductId(card) !== productId) return
   domUtils.markCardTasted(card, source !== null)
   const list = card.closest('ul')
   if (list && listView.hideTasted) domUtils.applyListView(list, listView)
@@ -143,21 +146,21 @@ let listView: domUtils.ListView = {
 function addListControls(card: Element) {
   const list = card.closest('ul')
   if (!list) return
-  domUtils.ensureListControls(list, listView, (view) => {
+  const isNewList = !list.previousElementSibling?.classList.contains('bp-sort')
+  domUtils.ensureListControls(list, listView, (view, current) => {
     listView = view
-    domUtils.ensureListControls(list, view, () => undefined)
-    domUtils.applyListView(list, view)
-    // Cards are only looked up once scrolled into view; sorting or filtering
-    // needs them all. The fetch queue paces the lookups as usual.
-    if (view.sortBy !== 'none' || view.hideTasted) {
-      for (const link of list.querySelectorAll(
-        productUtils.CARD_LINK_SELECTOR
-      )) {
-        void handleListCard(productUtils.getCard(link))
-      }
-    }
+    domUtils.ensureListControls(current, view, () => undefined)
+    domUtils.applyListView(current, view)
+    lookUpWholeList(current)
   })
   domUtils.applyListView(list, listView)
+  // The view outlives the list it was chosen on: on the next page or a new
+  // search, cards arrive with sorting or "Dölj provade" already on, so they
+  // are looked up straight away rather than only once scrolled into view.
+  if (listView.sortBy !== 'none' || listView.hideTasted) {
+    if (isNewList) lookUpWholeList(list)
+    else void handleListCard(card)
+  }
 }
 
 function handleRating(
@@ -194,6 +197,16 @@ function handleRating(
     default:
       domUtils.setMessage(t('noMatch'))
       return
+  }
+}
+
+// Cards are only looked up once scrolled into view; sorting or hiding tasted
+// ones needs them all. The fetch queue paces the lookups as usual, and a card
+// already badged returns at once.
+function lookUpWholeList(list: Element) {
+  if (listView.sortBy === 'none' && !listView.hideTasted) return
+  for (const link of list.querySelectorAll(productUtils.CARD_LINK_SELECTOR)) {
+    void handleListCard(productUtils.getCard(link))
   }
 }
 

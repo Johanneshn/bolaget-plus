@@ -381,6 +381,78 @@ describe('fetchRatingFromVivino', () => {
     expect(result.vintages).toBeUndefined()
   })
 
+  it('offers the runners-up from the same country behind a found match', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            id: 1,
+            name: 'Crianza',
+            region: { country: { code: 'es', name: 'Spain' } },
+            statistics: { ratings_average: 4.1, ratings_count: 1200 },
+            winery: { name: 'El Coto' }
+          },
+          {
+            id: 2,
+            name: 'Reserva',
+            region: { country: { code: 'es', name: 'Spain' } },
+            statistics: { ratings_average: 4.0, ratings_count: 900 },
+            winery: { name: 'El Coto' }
+          },
+          {
+            id: 3,
+            name: 'Crianza',
+            region: { country: { code: 'cl', name: 'Chile' } },
+            statistics: { ratings_average: 3.2, ratings_count: 50 },
+            winery: { name: 'El Coto Andino' }
+          }
+        ],
+        nbHits: 100
+      })
+    )
+
+    const result = await fetchRatingFromVivino(
+      'El Coto Crianza',
+      true,
+      { country: 'es' },
+      () => Promise.resolve(undefined)
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Found)
+    expect(result.name).toBe('El Coto Crianza')
+    // The match itself and the Chilean namesake are both left out.
+    expect(result.alternatives?.map((wine) => wine.name)).toEqual([
+      'El Coto Reserva'
+    ])
+  })
+
+  it('leaves the runners-up out of a list-card lookup', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            id: 1,
+            name: 'Crianza',
+            statistics: { ratings_average: 4.1, ratings_count: 1200 },
+            winery: { name: 'El Coto' }
+          },
+          {
+            id: 2,
+            name: 'Reserva',
+            statistics: { ratings_average: 4.0, ratings_count: 900 },
+            winery: { name: 'El Coto' }
+          }
+        ],
+        nbHits: 100
+      })
+    )
+
+    const result = await fetchRatingFromVivino('El Coto Crianza', false)
+
+    expect(result.status).toBe(RatingResultStatus.Found)
+    expect(result.alternatives).toBeUndefined()
+  })
+
   it('marks HTTP errors as transient so they are never cached', async () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 429 }))
 
@@ -448,6 +520,64 @@ describe('fetchRatingFromUntappd', () => {
     expect(new URLSearchParams(body.params).get('removeWordsIfNoResults')).toBe(
       'firstWords'
     )
+  })
+
+  // A loosened search finds something for nearly any title; only a hit whose
+  // brewery the title names may be taken as the answer.
+  it('accepts a loosened hit whose brewery the title names', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            beer_name: 'Nordic Unity APA',
+            beer_slug: 'hop-notch-brewing-nordic-unity-apa',
+            bid: 6252924,
+            brewery_beer_name: 'Hop Notch Brewing Nordic Unity APA',
+            brewery_name: 'Hop Notch Brewing',
+            rating_count: 120,
+            rating_score: 3.45
+          }
+        ],
+        queryAfterRemoval: '<em>Hop Notch x Fat Lizard</em> Nordic Unity'
+      })
+    )
+
+    const result = await fetchRatingFromUntappd(
+      'Hop Notch x Fat Lizard Nordic Unity',
+      searchConfig
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Found)
+    expect(result.link).toContain('/6252924')
+  })
+
+  it('never answers with a loosened hit from a brewery the title does not name', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            beer_name: 'Pilsner Urquell',
+            beer_slug: 'plzensky-prazdroj-pilsner-urquell',
+            bid: 4473,
+            brewery_beer_name: 'Plzeňský Prazdroj Pilsner Urquell',
+            brewery_name: 'Plzeňský Prazdroj',
+            rating_count: 400000,
+            rating_score: 3.6
+          }
+        ],
+        queryAfterRemoval: '<em>Qvarnbergs Jätteölet</em> Pilsner'
+      })
+    )
+
+    const result = await fetchRatingFromUntappd(
+      'Qvarnbergs Jätteölet Pilsner',
+      searchConfig
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Uncertain)
+    expect(result.alternatives?.map((beer) => beer.name)).toEqual([
+      'Pilsner Urquell'
+    ])
   })
 
   it('normalizes a missing score to 0 for the no-score rendering', async () => {

@@ -35,6 +35,18 @@ describe('parseUntappdExport', () => {
     expect(parseUntappdExport(csv)).toEqual([111, 3092])
   })
 
+  it('keeps a beer whose check-in comment spans several lines', () => {
+    const csv = [
+      'beer_name,comment,bid',
+      'First,"Fruity,',
+      'with a second line",111',
+      'Second,plain,222',
+      'Third,"ends in a newline',
+      '",333'
+    ].join('\r\n')
+    expect(parseUntappdExport(csv)).toEqual([111, 222, 333])
+  })
+
   it('finds nothing in a file that is not an Untappd export', () => {
     expect(parseUntappdExport('name,score\nfoo,1')).toEqual([])
     expect(parseUntappdExport('{ not json')).toEqual([])

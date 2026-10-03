@@ -140,3 +140,31 @@ describe('a match the user picked by hand', () => {
     ).resolves.toEqual(rating)
   })
 })
+
+describe('an entry cached by an older version', () => {
+  beforeEach(() => {
+    fakeBrowser.reset()
+    vi.restoreAllMocks()
+  })
+
+  it('is refetched on the product page when it lacks the vintages', async () => {
+    await saveRating(request, {
+      ...rating,
+      imageDataUrl: 'data:image/png;base64,AAAA'
+    })
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify({ hits: [], nbHits: 0 })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchRating(
+      request.productId,
+      request.productName,
+      ProductType.Wine,
+      true
+    )
+
+    expect(fetchMock).toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+})

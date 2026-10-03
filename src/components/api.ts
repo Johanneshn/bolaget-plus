@@ -236,8 +236,8 @@ export async function fetchRatingFromUntappd(
           // Lizard Nordic Unity") but indexed under one, so the full title
           // matches nothing. When — and only when — a query has no hits,
           // Algolia drops words from the front until one does, which sheds
-          // the brewery names before the beer's own. Whatever that finds still
-          // has to pass the similarity check below.
+          // the brewery names before the beer's own. Such a loosened search
+          // must be confirmed by its brewery; see below.
           removeWordsIfNoResults: 'firstWords'
         }).toString()
       }),
@@ -281,9 +281,18 @@ export async function fetchRatingFromUntappd(
       })
       .sort((a, b) => b.similarityRate - a.similarityRate)
 
-    const bestMatch = scored[0]
+    // A search Algolia had to loosen finds something for almost any title
+    // ("Qvarnbergs Jätteölet Pilsner" turns up Pilsner Urquell, a scant 0.3
+    // similar), so its hits only count when the title names their brewery —
+    // as the collaboration it exists for does. Otherwise they are offered as
+    // alternatives, never as the answer: a beer Untappd lacks used to read as
+    // not found, and must not become a confident wrong rating instead.
+    const candidates = data.queryAfterRemoval
+      ? scored.filter((beer) => queryNamesBrewery(productName, beer.brewery))
+      : scored
+    const bestMatch = candidates.at(0)
 
-    if (bestMatch.similarityRate < 0.2) {
+    if (!bestMatch || bestMatch.similarityRate < 0.2) {
       return {
         alternatives: toAlternatives(scored),
         link: searchFallbackUrl,
@@ -294,7 +303,7 @@ export async function fetchRatingFromUntappd(
     // Return only the response contract — similarityRate is internal.
     return {
       // The runners-up, for the user to correct a wrong match with.
-      alternatives: toAlternatives(scored.slice(1)),
+      alternatives: toAlternatives(scored.filter((beer) => beer !== bestMatch)),
       brewery: bestMatch.brewery,
       link: bestMatch.link,
       name: bestMatch.name,
@@ -630,6 +639,32 @@ function parseSearchConfig(html: string): null | UntappdSearchConfig {
 // but the remaining tokens must ALL be present: any-token overlap would let
 // "Knight Black Horse" pass for "Black Knight". An unknown winery cannot be
 // confirmed and never passes.
+// Words in a brewery's name that say what it is rather than which one.
+const BREWERY_COMPANY_WORDS = new Set([
+  'ales',
+  'beer',
+  'beers',
+  'birrificio',
+  'brasserie',
+  'brauerei',
+  'breweries',
+  'brewers',
+  'brewery',
+  'brewhouse',
+  'brewing',
+  'brouwerij',
+  'browar',
+  'bryggeri',
+  'bryggerier',
+  'bryggeriet',
+  'brygghus',
+  'cerveceria',
+  'company',
+  'craft',
+  'pivovar',
+  'project'
+])
+
 function queryContainsWinery(
   query: string,
   winery: string | undefined
@@ -647,6 +682,19 @@ function queryContainsWinery(
   return wineryTokens.every((wineryToken) =>
     containsToken(queryTokens, wineryToken)
   )
+}
+
+// Whether the Systembolaget title names the brewery: any distinctive word of
+// its name ("Hop Notch Brewing" → hop, notch) found in the title.
+function queryNamesBrewery(
+  query: string,
+  brewery: null | string | undefined
+): boolean {
+  if (!brewery) return false
+  const queryTokens = distinctiveTokens(query)
+  return distinctiveTokens(brewery)
+    .filter((token) => !BREWERY_COMPANY_WORDS.has(token))
+    .some((token) => containsToken(queryTokens, token))
 }
 
 function readCountryValue(

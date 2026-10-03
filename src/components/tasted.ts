@@ -114,11 +114,11 @@ export async function setTasted(
 }
 
 function idsFromCsv(text: string): number[] {
-  const [header, ...rows] = text.split(/\r?\n/)
-  const column = splitCsvLine(header).indexOf('bid')
+  const [header, ...rows] = parseCsv(text)
+  const column = header.indexOf('bid')
   if (column < 0) return []
   return rows.flatMap((row) => {
-    const id = Number(splitCsvLine(row)[column])
+    const id = Number(row[column])
     return Number.isInteger(id) && id > 0 ? [id] : []
   })
 }
@@ -136,16 +136,18 @@ function idsFromJson(text: string): number[] {
   }
 }
 
-// Splits one CSV line, honouring quoted fields: beer and brewery names in an
-// Untappd export carry commas of their own.
-function splitCsvLine(line: string): string[] {
-  const fields: string[] = []
+// Parses CSV into rows of fields, honouring quoted fields — beer and brewery
+// names carry commas, and check-in comments carry line breaks of their own,
+// so the text cannot be split into lines first.
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
   let field = ''
   let quoted = false
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
     if (quoted) {
-      if (char === '"' && line[i + 1] === '"') {
+      if (char === '"' && text[i + 1] === '"') {
         field += '"'
         i++
       } else if (char === '"') {
@@ -156,14 +158,21 @@ function splitCsvLine(line: string): string[] {
     } else if (char === '"') {
       quoted = true
     } else if (char === ',') {
-      fields.push(field)
+      row.push(field.trim())
+      field = ''
+    } else if (char === '\n' || char === '\r') {
+      if (char === '\r' && text[i + 1] === '\n') i++
+      row.push(field.trim())
+      rows.push(row)
+      row = []
       field = ''
     } else {
       field += char
     }
   }
-  fields.push(field)
-  return fields.map((value) => value.trim())
+  row.push(field.trim())
+  rows.push(row)
+  return rows
 }
 
 function tastedKey(productId: string): `local:${string}` {
