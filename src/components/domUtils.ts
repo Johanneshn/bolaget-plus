@@ -13,39 +13,33 @@ const RATING_CONTAINER_ID = 'rating-container'
 const RATING_CONTAINER_BODY_ID = 'rating-container-body'
 const STYLE_ID = 'bolaget-plus-css'
 
+// The rating section borrows Systembolaget's own design tokens (with
+// fallbacks for when a redesign renames them) so it reads as part of the
+// product page: a flat block between hairlines, labelled like the page's own
+// "FYLLIGHET"-style headings, rather than a branded widget on top of it.
+const FG = 'var(--foreground, #262626)'
+const MUTED_FG = 'var(--muted-foreground, #262626b3)'
+const BORDER = 'var(--border, #2626261a)'
+const MUTED_BG = 'var(--muted, #2626260d)'
+
 const STYLES = `
   #${RATING_CONTAINER_ID} {
-    margin-top: 12px;
-    border: 1px solid #e3e3e3;
-    border-left: 4px solid #095741;
-    border-radius: 8px;
-    background: #ffffff;
+    margin: 16px 0;
+    padding: 12px 0;
+    border-top: 1px solid ${BORDER};
+    border-bottom: 1px solid ${BORDER};
     font-family: inherit;
     font-size: 14px;
-    color: #1a1a1a;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    color: ${FG};
   }
   #${RATING_CONTAINER_ID} .bp-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 12px;
-    font-weight: 600;
+    margin-bottom: 8px;
+    font-family: var(--font-bolaget-medium-condensed, inherit);
     font-size: 13px;
-    letter-spacing: 0.2px;
-    color: #095741;
-    border-bottom: 1px solid #f0f0f0;
-  }
-  #${RATING_CONTAINER_ID} .bp-logo {
-    width: 12px;
-    height: 12px;
-    transform: rotate(45deg);
-    border-radius: 2px;
-    background: #095741;
-  }
-  #${RATING_CONTAINER_BODY_ID} {
-    padding: 10px 12px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: ${MUTED_FG};
   }
   #${RATING_CONTAINER_ID} .bp-rating-row {
     display: flex;
@@ -58,7 +52,7 @@ const STYLES = `
     line-height: 1;
   }
   #${RATING_CONTAINER_ID} .bp-scale {
-    color: #888;
+    color: ${MUTED_FG};
     font-size: 13px;
   }
   #${RATING_CONTAINER_ID} .bp-footer {
@@ -69,27 +63,25 @@ const STYLES = `
     margin-top: 8px;
   }
   #${RATING_CONTAINER_ID} .bp-meta {
-    color: #666;
-    font-size: 12px;
+    color: ${MUTED_FG};
+    font-size: 13px;
     line-height: 1.4;
   }
   #${RATING_CONTAINER_ID} .bp-link {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    color: #095741;
+    color: ${FG};
     font-size: 13px;
-    font-weight: 500;
-    text-decoration: none;
+    text-decoration: underline;
+    text-underline-offset: 2px;
     white-space: nowrap;
   }
   #${RATING_CONTAINER_ID} .bp-link:hover {
-    text-decoration: underline;
+    text-decoration-thickness: 2px;
   }
   #${RATING_CONTAINER_ID} .bp-message {
-    color: #666;
-    text-align: center;
-    padding: 2px 0;
+    color: ${MUTED_FG};
   }
   #${RATING_CONTAINER_ID} .bp-alt-list {
     display: flex;
@@ -103,13 +95,13 @@ const STYLES = `
     gap: 10px;
     min-height: 44px;
     padding: 6px 8px;
-    border-top: 1px solid #f0f0f0;
-    color: #1a1a1a;
+    border-top: 1px solid ${BORDER};
+    color: ${FG};
     text-decoration: none;
   }
   #${RATING_CONTAINER_ID} .bp-alt-item:hover,
   #${RATING_CONTAINER_ID} .bp-alt-item:active {
-    background: #f6f6f6;
+    background: ${MUTED_BG};
   }
   #${RATING_CONTAINER_ID} .bp-alt-name {
     flex: 1;
@@ -127,7 +119,7 @@ const STYLES = `
     white-space: nowrap;
   }
   #${RATING_CONTAINER_ID} .bp-alt-votes {
-    color: #888;
+    color: ${MUTED_FG};
     font-size: 11px;
     font-weight: 400;
   }
@@ -164,16 +156,15 @@ const STYLES = `
   }
   #${RATING_CONTAINER_ID} .bp-spinner-wrap {
     display: flex;
-    justify-content: center;
     align-items: center;
     height: 48px;
     gap: 10px;
   }
   #${RATING_CONTAINER_ID} .bp-spinner {
-    width: 24px;
-    height: 24px;
-    border: 3px solid #e8e8e8;
-    border-top-color: #095741;
+    width: 20px;
+    height: 20px;
+    border: 2px solid ${BORDER};
+    border-top-color: ${FG};
     border-radius: 50%;
     animation: bp-spin 0.8s linear infinite;
   }
@@ -190,10 +181,10 @@ const STYLES = `
   .bp-card-rating .bp-card-score {
     font-weight: 700;
     font-size: 12px;
-    color: #1a1a1a;
+    color: ${FG};
   }
   .bp-card-rating .bp-card-votes {
-    color: #888;
+    color: ${MUTED_FG};
     font-size: 11px;
   }
   .bp-card-spinner-inline {
@@ -201,8 +192,8 @@ const STYLES = `
     width: 12px;
     height: 12px;
     margin-top: 6px;
-    border: 2px solid #e8e8e8;
-    border-top-color: #095741;
+    border: 2px solid ${BORDER};
+    border-top-color: ${FG};
     border-radius: 50%;
     animation: bp-spin 0.8s linear infinite;
   }
@@ -230,7 +221,7 @@ export function injectRatingContainer() {
 
   const header = document.createElement('div')
   header.className = 'bp-header'
-  header.innerHTML = `<span class="bp-logo"></span><span>Bolaget+</span>`
+  header.textContent = 'Bolaget+'
   ratingContainer.appendChild(header)
 
   const bodyDiv = document.createElement('div')
