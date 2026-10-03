@@ -8,7 +8,6 @@ import {
 } from '@/@types/types'
 import {
   injectCardSpinner,
-  ratingTier,
   replaceCardSpinner,
   setRating,
   setUncertain
@@ -48,23 +47,13 @@ describe('replaceCardSpinner', () => {
     expect(badge(renderCard('203701'), 3.8, 7606)).toBe('3.8')
   })
 
-  it('tints the badge by tier and labels it for screen readers', () => {
+  it('labels the badge for screen readers', () => {
     const card = renderCard('203701')
     badge(card, 4.1, 812)
 
-    const element = card.querySelector<HTMLElement>('.bp-card-rating')
-    expect(element?.dataset.tier).toBe('high')
-    expect(element?.getAttribute('aria-label')).toBe('4.1 av 5, 812 röster')
-  })
-
-  it.each([
-    [4, 'high'],
-    [3.9, 'mid'],
-    [3.5, 'mid'],
-    [3.4, 'low'],
-    [0, 'low']
-  ])('puts %s in the %s tier', (score, tier) => {
-    expect(ratingTier(score)).toBe(tier)
+    expect(
+      card.querySelector('.bp-card-rating')?.getAttribute('aria-label')
+    ).toBe('4.1 av 5, 812 röster')
   })
 
   it('shows a score of 0 as not rated yet, not as zero', () => {
