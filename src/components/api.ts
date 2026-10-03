@@ -9,6 +9,7 @@ import {
   UntappdHit,
   UntappdSearchConfig,
   UntappdSearchJSON,
+  VintageRating,
   VivinoCountry,
   VivinoHit,
   VivinoSearchJSON
@@ -377,6 +378,7 @@ export async function fetchRatingFromVivino(
           similarityRate: similarity(query, fullName),
           status: RatingResultStatus.Found,
           unmatchedWords: countUnmatchedWords(query, hit.name),
+          vintages: toVintageRatings(hit),
           votes,
           wineNameRate: similarity(query, hit.name),
           winery
@@ -446,6 +448,7 @@ export async function fetchRatingFromVivino(
       name: bestMatch.name,
       rating: bestMatch.rating,
       status: bestMatch.status,
+      vintages: includeImage ? bestMatch.vintages : undefined,
       votes: bestMatch.votes
     }
   } catch {
@@ -679,6 +682,23 @@ function toSearchConfig(json: string): null | UntappdSearchConfig {
   } catch {
     return null
   }
+}
+
+// The vintages Vivino lists for a wine, by year. The "U.V." (all vintages)
+// entry is the pooled rating already shown, so only real years are kept.
+function toVintageRatings(hit: VivinoHit): VintageRating[] {
+  return (hit.vintages ?? []).flatMap((vintage) => {
+    const year = String(vintage.year ?? '')
+    if (!/^\d{4}$/.test(year)) return []
+    return [
+      {
+        id: vintage.id,
+        rating: vintage.statistics?.ratings_average ?? 0,
+        votes: vintage.statistics?.ratings_count ?? 0,
+        year
+      }
+    ]
+  })
 }
 
 // vivino.com/wines/{id} resolves by vintage id, not wine id (see the

@@ -10,6 +10,7 @@ import {
   getCardProductType,
   getProducer,
   getProductName,
+  getProductVintage,
   isCardBottle
 } from '@/components/productUtils'
 
@@ -260,6 +261,26 @@ describe('getCardName', () => {
     const card = renderCard({ subtitle: '' })
 
     expect(getCardName(card)).toBe('Amadio')
+  })
+})
+
+describe('getProductVintage', () => {
+  it('reads the vintage at the end of the subtitle', () => {
+    renderProductPage('Bread & Butter', 'Pinot Noir, 2024')
+
+    expect(getProductVintage()).toBe('2024')
+  })
+
+  it('reads a subtitle that is nothing but the vintage', () => {
+    renderProductPage('Amadio', '2021')
+
+    expect(getProductVintage()).toBe('2021')
+  })
+
+  it('is null for a wine without a vintage', () => {
+    renderProductPage('Jinyu', 'Junmai Ginjo')
+
+    expect(getProductVintage()).toBeNull()
   })
 })
 

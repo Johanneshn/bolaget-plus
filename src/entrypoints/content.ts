@@ -97,7 +97,12 @@ async function handleListCard(card: Element) {
 function handleRating(productType: ProductType, rating: RatingResponse) {
   switch (rating.status) {
     case RatingResultStatus.Found:
-      domUtils.setRating(productType, rating, rating.link)
+      domUtils.setRating(
+        productType,
+        rating,
+        rating.link,
+        productUtils.getProductVintage()
+      )
       return
     case RatingResultStatus.Uncertain:
       domUtils.setUncertain(productType, rating)

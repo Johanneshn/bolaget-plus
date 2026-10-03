@@ -56,6 +56,20 @@ const STYLES = `
     color: ${MUTED_FG};
     font-size: 13px;
   }
+  #${RATING_CONTAINER_ID} .bp-vintage {
+    display: inline-block;
+    margin-top: 4px;
+    color: ${FG};
+    font-size: 13px;
+    text-decoration: none;
+  }
+  #${RATING_CONTAINER_ID} .bp-vintage:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  #${RATING_CONTAINER_ID} .bp-vintage strong {
+    font-weight: 700;
+  }
   #${RATING_CONTAINER_ID} .bp-footer {
     display: flex;
     justify-content: space-between;
@@ -251,7 +265,8 @@ export function setMessage(message: string) {
 export function setRating(
   productType: ProductType,
   rating: RatingResponse,
-  link: null | string
+  link: null | string,
+  vintageYear: null | string = null
 ) {
   const ratingContainer = getAndClearContainer()
 
@@ -299,6 +314,12 @@ export function setRating(
 
   ratingContainer.appendChild(ratingRow)
   ratingContainer.appendChild(footer)
+  const vintage = createVintageLine(rating, vintageYear)
+  if (vintage) {
+    // Two vote counts on one card need telling apart.
+    meta.innerText += ` · ${i18n.t('allVintages')}`
+    ratingContainer.appendChild(vintage)
+  }
 }
 
 export function setUncertain(productType: ProductType, rating: RatingResponse) {
@@ -408,6 +429,41 @@ function createThumbnail(dataUrl: string, className: string): HTMLImageElement {
   img.alt = ''
   attachZoomOnHover(img, dataUrl)
   return img
+}
+
+// "Årgång 2024: 3.9 (846 röster)" under the pooled rating, when Vivino lists
+// the vintage on the shelf. The pooled rating stays the headline: a single
+// vintage often has few ratings, and Vivino publishes no average at all below
+// its threshold — that case says so rather than hiding the line.
+function createVintageLine(
+  rating: RatingResponse,
+  year: null | string
+): HTMLElement | null {
+  const vintage = year
+    ? rating.vintages?.find((candidate) => candidate.year === year)
+    : undefined
+  if (!vintage) return null
+
+  const line = document.createElement('a')
+  line.className = 'bp-vintage'
+  line.href = `https://www.vivino.com/wines/${vintage.id.toString()}`
+  line.target = '_blank'
+  line.rel = 'noopener noreferrer'
+
+  const label = document.createElement('span')
+  label.textContent = `${i18n.t('vintage')} ${vintage.year}: `
+  line.appendChild(label)
+
+  const score = document.createElement('strong')
+  if (vintage.rating > 0) {
+    score.textContent = vintage.rating.toString()
+    line.appendChild(score)
+    line.append(` (${vintage.votes.toString()} ${i18n.t('votes')})`)
+  } else {
+    score.textContent = i18n.t('noRatingYet')
+    line.appendChild(score)
+  }
+  return line
 }
 
 let zoomPreview: HTMLImageElement | null = null

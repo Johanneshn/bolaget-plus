@@ -63,6 +63,10 @@ export interface RatingResponse {
   // error) rather than a definitive lookup miss — never cached, so the next
   // visit retries instead of pinning a wrong answer for a day.
   transient?: boolean
+  // Vivino's per-vintage ratings for the matched wine, so the product page can
+  // show the one on the shelf next to the pooled rating. Only sent with images
+  // (product pages); a list badge shows the pooled rating alone.
+  vintages?: VintageRating[]
   votes: number
 }
 
@@ -94,6 +98,15 @@ export interface UntappdSearchJSON {
   hits?: UntappdHit[]
 }
 
+// One vintage's Vivino rating. A rating of 0 means Vivino has too few ratings
+// for that vintage to publish an average ("BelowThreshold").
+export interface VintageRating {
+  id: number
+  rating: number
+  votes: number
+  year: string
+}
+
 // Vivino writes a hit's country in more than one shape depending on the index
 // build — a nested object, a bare code, or a name — so it is read defensively.
 export type VivinoCountry =
@@ -123,7 +136,11 @@ export interface VivinoHit {
   }
   vintages?: {
     id: number
-    statistics?: { ratings_count: null | number }
+    statistics?: {
+      ratings_average?: null | number
+      ratings_count: null | number
+    }
+    year?: null | number | string
   }[]
   winery?: null | { name: null | string }
 }

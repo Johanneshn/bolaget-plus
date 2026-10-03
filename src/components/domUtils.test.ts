@@ -7,7 +7,11 @@ import {
   type RatingResponse,
   RatingResultStatus
 } from '@/@types/types'
-import { injectCardSpinner, replaceCardSpinner } from '@/components/domUtils'
+import {
+  injectCardSpinner,
+  replaceCardSpinner,
+  setRating
+} from '@/components/domUtils'
 
 function badge(card: Element, rating: number, votes: number): string {
   const spinner = injectCardSpinner(card, '203701')
@@ -66,5 +70,49 @@ describe('replaceCardSpinner', () => {
     } as RatingResponse)
 
     expect(card.querySelector('.bp-card-rating')).toBeNull()
+  })
+})
+
+describe('setRating', () => {
+  function renderProductPage(): void {
+    document.body.innerHTML =
+      '<main><h1><span>Bread & Butter</span></h1></main>'
+  }
+
+  const rating = {
+    link: 'https://www.vivino.com/wines/1',
+    name: 'Bread & Butter Pinot Noir',
+    rating: 4,
+    status: RatingResultStatus.Found,
+    vintages: [
+      { id: 25, rating: 0, votes: 4, year: '2025' },
+      { id: 24, rating: 3.9, votes: 846, year: '2024' }
+    ],
+    votes: 98172
+  } as RatingResponse
+
+  it('shows the rating of the vintage on the shelf', () => {
+    renderProductPage()
+    setRating(ProductType.Wine, rating, rating.link, '2024')
+
+    const line = document.querySelector<HTMLAnchorElement>('.bp-vintage')
+    expect(line?.textContent).toBe('vintage 2024: 3.9 (846 votes)')
+    expect(line?.href).toBe('https://www.vivino.com/wines/24')
+  })
+
+  it('says so when the vintage has too few ratings', () => {
+    renderProductPage()
+    setRating(ProductType.Wine, rating, rating.link, '2025')
+
+    expect(document.querySelector('.bp-vintage')?.textContent).toBe(
+      'vintage 2025: noRatingYet'
+    )
+  })
+
+  it('shows no vintage line for a vintage Vivino does not list', () => {
+    renderProductPage()
+    setRating(ProductType.Wine, rating, rating.link, '2019')
+
+    expect(document.querySelector('.bp-vintage')).toBeNull()
   })
 })

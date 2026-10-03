@@ -123,6 +123,14 @@ export function getProductType(): ProductType {
   return ProductType.Uncertain
 }
 
+// The vintage on the product page's title ("Pinot Noir, 2024" or just "2024"),
+// for showing that vintage's own Vivino rating. Null for a non-vintage wine.
+export function getProductVintage(): null | string {
+  const subtitle = document.querySelector('main h1')?.children[1]
+  const last = subtitle?.textContent.split(',').pop()?.trim() ?? ''
+  return VINTAGE_ONLY.test(last) ? last : null
+}
+
 // Wine formats that are not a bottle and have no comparable Vivino rating.
 // We exclude these rather than allow-list bottle types, so bottle variants
 // (Flaska, Magnum, Halvflaska, …) all pass without enumerating them.
