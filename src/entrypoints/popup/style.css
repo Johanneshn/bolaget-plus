@@ -256,6 +256,21 @@ h2 {
   text-decoration-thickness: 2px;
 }
 
+/* Firefox for Android opens the popup as a whole page. A desktop popup's
+   viewport is its own 300px, so this never matches there; on a phone the
+   page fills the screen instead of leaving most of it empty. */
+@media (min-width: 340px) {
+  html,
+  body {
+    width: auto;
+  }
+
+  .popup {
+    max-width: 560px;
+    padding: 24px 20px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
