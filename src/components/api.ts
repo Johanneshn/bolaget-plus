@@ -1,5 +1,3 @@
-import stringSimilarity from 'string-similarity'
-
 import {
   BeerResponse,
   ProductFacts,
@@ -15,6 +13,7 @@ import {
   VivinoSearchJSON
 } from '@/@types/types'
 import { countryCode } from '@/components/countries'
+import { compareTwoStrings } from '@/components/similarity'
 
 // Untappd's search page renders results client-side via Algolia, so the HTML
 // carries no beers — but it does carry the search-only credentials its own JS
@@ -257,8 +256,8 @@ export async function fetchRatingFromUntappd(
     const scored = hits
       .map((hit: UntappdHit): ScoredBeer => {
         const similarityRate = Math.max(
-          stringSimilarity.compareTwoStrings(productName, hit.beer_name),
-          stringSimilarity.compareTwoStrings(productName, hit.brewery_beer_name)
+          compareTwoStrings(productName, hit.beer_name),
+          compareTwoStrings(productName, hit.brewery_beer_name)
         )
 
         return {
@@ -517,8 +516,7 @@ function containsToken(tokens: string[], token: string): boolean {
   return tokens.some(
     (candidate) =>
       candidate === token ||
-      stringSimilarity.compareTwoStrings(candidate, token) >=
-        BRAND_TOKEN_MATCH_THRESHOLD
+      compareTwoStrings(candidate, token) >= BRAND_TOKEN_MATCH_THRESHOLD
   )
 }
 
@@ -656,7 +654,7 @@ function readCountryValue(
 }
 
 function similarity(a: string, b: string): number {
-  return stringSimilarity.compareTwoStrings(normalize(a), normalize(b))
+  return compareTwoStrings(normalize(a), normalize(b))
 }
 
 function toAlternatives(

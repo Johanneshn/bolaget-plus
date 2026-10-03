@@ -92,7 +92,7 @@ external fetches are delegated to the background script.
    index, `fetchRatingFromUntappd` the `beer` index. Wine label thumbnails
    are downloaded by the background script and inlined as `data:` URLs
    because the page CSP blocks hotlinking Vivino's image hosts.
-5. `api.ts` scores candidates with `string-similarity`. A Vivino match must
+5. `api.ts` scores candidates with a bigram (Dice) similarity (`similarity.ts`). A Vivino match must
    additionally be confirmed by the producer (`queryContainsWinery`) or be an
    exact name hit on a distinctive title — see the comments in that file for
    the regressions each rule guards. Two facts Systembolaget states about the
