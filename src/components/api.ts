@@ -232,9 +232,9 @@ export async function fetchRatingFromUntappd(
         params: new URLSearchParams({
           hitsPerPage: '5',
           query: productName,
-          // Collaborations are titled with every brewery ("Hop Notch x Fat
-          // Lizard Nordic Unity") but indexed under one, so the full title
-          // matches nothing. When — and only when — a query has no hits,
+          // Collaborations are titled with every brewery ("To Øl x
+          // Mikkeller Snublejuice") but indexed under one, so the full title
+          // can match nothing. When — and only when — a query has no hits,
           // Algolia drops words from the front until one does, which sheds
           // the brewery names before the beer's own. Such a loosened search
           // must be confirmed by its brewery; see below.
@@ -687,17 +687,26 @@ function queryContainsWinery(
   )
 }
 
-// Whether the Systembolaget title names the brewery: any distinctive word of
-// its name ("Hop Notch Brewing" → hop, notch) found in the title.
+// Whether the Systembolaget title names the brewery: a distinctive word of its
+// name ("Hop Notch Brewing" → hop, notch) found word for word in the title —
+// exactly, not by similarity: "Ekologiska" of one brewery must not pass for
+// the "Ekologisk" of another product's title. A brewery named only in short
+// words ("To Øl") has no distinctive word, so its whole name is looked for
+// instead.
 function queryNamesBrewery(
   query: string,
   brewery: null | string | undefined
 ): boolean {
   if (!brewery) return false
-  const queryTokens = distinctiveTokens(query)
-  return distinctiveTokens(brewery)
-    .filter((token) => !BREWERY_COMPANY_WORDS.has(token))
-    .some((token) => containsToken(queryTokens, token))
+  const queryWords = new Set(normalize(query).split(' '))
+  const breweryTokens = distinctiveTokens(brewery).filter(
+    (token) => !BREWERY_COMPANY_WORDS.has(token)
+  )
+  if (breweryTokens.length === 0) {
+    const name = normalize(brewery)
+    return name !== '' && ` ${normalize(query)} `.includes(` ${name} `)
+  }
+  return breweryTokens.some((token) => queryWords.has(token))
 }
 
 function readCountryValue(

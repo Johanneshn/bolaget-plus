@@ -580,6 +580,59 @@ describe('fetchRatingFromUntappd', () => {
     expect(result.status).toBe(RatingResultStatus.Found)
   })
 
+  it('does not take a brewery word that only resembles the title', async () => {
+    // "Ekologiska" (a brewery) must not confirm the "Ekologisk" of a title.
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            beer_name: 'Hard Kombucha Original',
+            beer_slug: 'qvillinge-hard-kombucha-original',
+            bid: 2,
+            brewery_beer_name: 'Qvillinge Ekologiska Hard Kombucha Original',
+            brewery_name: 'Qvillinge Ekologiska',
+            rating_count: 40,
+            rating_score: 3.4
+          }
+        ],
+        queryAfterRemoval: '<em>Sofiero</em> Original Ekologisk'
+      })
+    )
+
+    const result = await fetchRatingFromUntappd(
+      'Sofiero Original Ekologisk',
+      searchConfig
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Uncertain)
+  })
+
+  it('confirms a brewery named only in short words by its whole name', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            beer_name: 'Snublejuice',
+            beer_slug: 'to-ol-snublejuice',
+            bid: 3,
+            brewery_beer_name: 'To Øl Snublejuice',
+            brewery_name: 'To Øl',
+            rating_count: 9000,
+            rating_score: 3.6
+          }
+        ],
+        queryAfterRemoval: '<em>To Øl x Mikkeller</em> Snublejuice'
+      })
+    )
+
+    const result = await fetchRatingFromUntappd(
+      'To Øl x Mikkeller Snublejuice',
+      searchConfig
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Found)
+  })
+
   it('never answers with a loosened hit from a brewery the title does not name', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
