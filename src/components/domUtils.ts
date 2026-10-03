@@ -286,7 +286,7 @@ export function getAndClearContainer(): HTMLElement {
   container = document.getElementById(RATING_CONTAINER_BODY_ID)!
   // Re-rendering can remove a hovered thumbnail without a mouseleave firing.
   hideZoomPreview()
-  container.innerHTML = ''
+  container.replaceChildren()
   return container
 }
 
@@ -322,7 +322,10 @@ export function setMessage(message: string) {
   if (!ratingContainer) {
     return
   }
-  ratingContainer.innerHTML = `<div class="bp-message">${message}</div>`
+  const element = document.createElement('div')
+  element.className = 'bp-message'
+  element.textContent = message
+  ratingContainer.replaceChildren(element)
 }
 
 export function setRating(
@@ -334,24 +337,26 @@ export function setRating(
 ) {
   const ratingContainer = getAndClearContainer()
 
-  const svg =
-    productType === ProductType.Wine
-      ? generateStarsSvg(rating.rating)
-      : generateCapSvg(rating.rating)
+  const stars = document.createElement('span')
+  stars.className = 'bp-stars'
+  stars.setAttribute('role', 'img')
+  stars.setAttribute('aria-label', ratingLabel(rating))
+  stars.appendChild(createRatingIcons(productType, rating.rating))
 
+  const score = document.createElement('span')
+  score.setAttribute('aria-hidden', 'true')
+  score.appendChild(createScore(rating.rating, 'bp-score'))
   // A score of 0 means the source has too few ratings to compute one yet.
-  const scoreHtml =
-    rating.rating > 0
-      ? `<span class="bp-score">${rating.rating.toString()}</span>
-        <span class="bp-scale">/ 5</span>`
-      : `<span class="bp-score" title="${t('noRatingYet')}">N/A</span>`
+  if (rating.rating > 0) {
+    const scale = document.createElement('span')
+    scale.className = 'bp-scale'
+    scale.textContent = ' / 5'
+    score.appendChild(scale)
+  }
 
   const ratingRow = document.createElement('div')
   ratingRow.className = 'bp-rating-row'
-  ratingRow.innerHTML = `
-        <span class="bp-stars" role="img" aria-label="${ratingLabel(rating)}">${svg}</span>
-        <span aria-hidden="true">${scoreHtml}</span>
-      `
+  ratingRow.append(stars, score)
   if (rating.imageDataUrl) {
     ratingRow.prepend(createThumbnail(rating.imageDataUrl, 'bp-thumb'))
   }
@@ -425,10 +430,12 @@ export function showLoadingSpinner() {
   const ratingContainer = getAndClearContainer()
   const spinner = document.createElement('div')
   spinner.className = 'bp-spinner-wrap'
-  spinner.innerHTML = `
-      <div class="bp-spinner"></div>
-      <span class="bp-message">${t('loading')}</span>
-    `
+  const wheel = document.createElement('div')
+  wheel.className = 'bp-spinner'
+  const label = document.createElement('span')
+  label.className = 'bp-message'
+  label.textContent = t('loading')
+  spinner.append(wheel, label)
 
   ratingContainer.appendChild(spinner)
 }
@@ -462,10 +469,7 @@ function createAlternativeItem(
   score.className = 'bp-alt-score'
   // A score of 0 means the source has too few ratings to compute one yet.
   if (alternative.rating > 0) {
-    score.innerHTML =
-      productType === ProductType.Wine
-        ? generateStarsSvg(alternative.rating)
-        : generateCapSvg(alternative.rating)
+    score.appendChild(createRatingIcons(productType, alternative.rating))
   }
   const value = document.createElement('span')
   value.textContent =
@@ -804,20 +808,19 @@ export function replaceCardSpinner(
   if (rating.status !== RatingResultStatus.Found) {
     return
   }
-  const svg =
-    productType === ProductType.Wine
-      ? generateStarsSvg(rating.rating)
-      : generateCapSvg(rating.rating)
   const badge = document.createElement('div')
   badge.className = CARD_RATING_CLASS
   badge.setAttribute(CARD_PRODUCT_ATTRIBUTE, productId)
   badge.setAttribute('role', 'img')
   badge.setAttribute('aria-label', ratingLabel(rating))
-  badge.innerHTML = `
-    ${svg}
-    ${cardScoreHtml(rating.rating)}
-    <span class="bp-card-votes">(${rating.votes.toString()})</span>
-  `
+  const votes = document.createElement('span')
+  votes.className = 'bp-card-votes'
+  votes.textContent = `(${rating.votes.toString()})`
+  badge.append(
+    createRatingIcons(productType, rating.rating),
+    createScore(rating.rating, 'bp-card-score'),
+    votes
+  )
   // The SPA may have re-rendered the card's contents while the rating request
   // was in flight, detaching the spinner or putting another product in the
   // tile — so re-check both instead of replacing a node that may be gone.
@@ -827,13 +830,34 @@ export function replaceCardSpinner(
   findCardAnchor(card)?.insertAdjacentElement('afterend', badge)
 }
 
-// A score of 0 means the source has too few ratings to compute one yet —
-// Vivino withholds the average below about 25 ratings — not that it is rated
-// zero, so show it as on the product page.
-function cardScoreHtml(score: number): string {
-  return score > 0
-    ? `<span class="bp-card-score">${score.toString()}</span>`
-    : `<span class="bp-card-score" title="${t('noRatingYet')}">N/A</span>`
+// Stars (wine) or bottle caps (beer, cider) for a score. The icons are our own
+// static SVG markup, parsed rather than assigned through innerHTML: Mozilla's
+// add-on review flags every innerHTML assignment, trusted or not.
+function createRatingIcons(productType: ProductType, score: number): Node {
+  const markup =
+    productType === ProductType.Wine
+      ? generateStarsSvg(score)
+      : generateCapSvg(score)
+  const fragment = document.createDocumentFragment()
+  fragment.append(
+    ...new DOMParser().parseFromString(markup, 'text/html').body.childNodes
+  )
+  return fragment
+}
+
+// The score as text. A score of 0 means the source has too few ratings to
+// compute one yet — Vivino withholds the average below about 25 ratings — not
+// that it is rated zero, so it reads "N/A" with the reason on hover.
+function createScore(score: number, className: string): HTMLElement {
+  const element = document.createElement('span')
+  element.className = className
+  if (score > 0) {
+    element.textContent = score.toString()
+  } else {
+    element.textContent = 'N/A'
+    element.title = t('noRatingYet')
+  }
+  return element
 }
 
 // The line a card's badge goes under: the "750 ml · 13 % vol. · Nr 223701"
