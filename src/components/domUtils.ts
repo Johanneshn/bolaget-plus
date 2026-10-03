@@ -573,7 +573,7 @@ export function replaceCardSpinner(
   badge.setAttribute(CARD_PRODUCT_ATTRIBUTE, productId)
   badge.innerHTML = `
     ${svg}
-    <span class="bp-card-score">${rating.rating.toString()}</span>
+    ${cardScoreHtml(rating.rating)}
     <span class="bp-card-votes">(${rating.votes.toString()})</span>
   `
   // The SPA may have re-rendered the card's contents while the rating request
@@ -582,6 +582,15 @@ export function replaceCardSpinner(
   if (card.querySelector(`.${CARD_RATING_CLASS}`)) return
   if (getCardProductId(card) !== productId) return
   findCardAnchor(card)?.insertAdjacentElement('afterend', badge)
+}
+
+// A score of 0 means the source has too few ratings to compute one yet —
+// Vivino withholds the average below about 25 ratings — not that it is rated
+// zero, so show it as on the product page.
+function cardScoreHtml(score: number): string {
+  return score > 0
+    ? `<span class="bp-card-score">${score.toString()}</span>`
+    : `<span class="bp-card-score" title="${i18n.t('noRatingYet')}">N/A</span>`
 }
 
 // The line a card's badge goes under: the "750 ml · 13 % vol. · Nr 223701"
