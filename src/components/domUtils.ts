@@ -328,7 +328,7 @@ export function setUncertain(productType: ProductType, rating: RatingResponse) {
 
   const footer = document.createElement('div')
   footer.className = 'bp-footer'
-  footer.style.justifyContent = 'center'
+  footer.style.justifyContent = 'flex-end'
   footer.style.marginTop = '6px'
   footer.appendChild(createSourceLink(rating.link, linkLabel))
 
