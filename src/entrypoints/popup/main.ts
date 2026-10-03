@@ -40,6 +40,13 @@ async function bindCount(
     const value = await count()
     label.textContent = describe(value)
     button.disabled = value === 0
+    // Exporting an empty list is as pointless as clearing one.
+    if (buttonId === 'clearTasted') {
+      const exportButton = document.getElementById(
+        'exportTasted'
+      ) as HTMLButtonElement | null
+      if (exportButton) exportButton.disabled = value === 0
+    }
   }
   button.addEventListener('click', () => {
     void clear().then(render)
@@ -144,14 +151,19 @@ async function setupStoredData(): Promise<void> {
     'clearTasted',
     countTasted,
     clearTasted,
-    (count) => `${count.toLocaleString('sv-SE')} provade`
+    // Named, not counted, while empty: "0 provade" read as a bare counter.
+    (count) =>
+      count === 0 ? 'Provade' : `${count.toLocaleString('sv-SE')} provade`
   )
   const renderUntappd = await bindCount(
     'untappdCount',
     'clearUntappd',
     countUntappdBeers,
     clearUntappdBeers,
-    (count) => `${count.toLocaleString('sv-SE')} öl från Untappd`
+    (count) =>
+      count === 0
+        ? 'Untappd-historik'
+        : `${count.toLocaleString('sv-SE')} öl från Untappd`
   )
   bindFileImport(
     'untappdFile',

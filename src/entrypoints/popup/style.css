@@ -187,6 +187,23 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 
+.data-group + .data-group,
+.data-row + .data-group {
+  margin-top: 8px;
+}
+
+.hint {
+  margin: 2px 0 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.hint a {
+  color: var(--fg);
+  text-underline-offset: 3px;
+}
+
 .text-button {
   min-height: 28px;
   padding: 0 2px;
