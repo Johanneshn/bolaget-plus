@@ -1,4 +1,5 @@
 import { storage } from '@wxt-dev/storage'
+import browser from 'webextension-polyfill'
 
 import {
   RatingAlternative,
@@ -12,6 +13,17 @@ import {
 // until the user undoes it. Keyed on the product number, like the cache, so a
 // list card and its product page show the same pick.
 const PIN_KEY_PREFIX = 'local:pinned:'
+
+export async function clearPinnedMatches(): Promise<void> {
+  const keys = await pinnedKeys()
+  if (keys.length > 0) {
+    await browser.storage.local.remove(keys)
+  }
+}
+
+export async function countPinnedMatches(): Promise<number> {
+  return (await pinnedKeys()).length
+}
 
 export async function getPinnedRating(
   productId: string
@@ -42,4 +54,12 @@ export async function unpinMatch(productId: string): Promise<void> {
 
 function pinKey(productId: string): `local:${string}` {
   return `${PIN_KEY_PREFIX}${productId}` as `local:${string}`
+}
+
+// The raw storage.local keys, without @wxt-dev/storage's "local:" area prefix.
+async function pinnedKeys(): Promise<string[]> {
+  const prefix = PIN_KEY_PREFIX.slice('local:'.length)
+  return Object.keys(await browser.storage.local.get(null)).filter((key) =>
+    key.startsWith(prefix)
+  )
 }

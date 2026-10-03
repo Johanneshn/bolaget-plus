@@ -30,6 +30,21 @@ const SWEEP_INTERVAL_MS = 60 * 60 * 1000
 // bookkeeping.
 const LAST_SWEEP_KEY = 'local:ratings-last-sweep'
 
+// Drops every cached rating, so the next visit looks each product up again.
+// Matches the user picked by hand are kept: they live outside this prefix.
+export async function clearRatings(): Promise<void> {
+  const keys = await ratingKeys()
+  if (keys.length > 0) {
+    await browser.storage.local.remove(keys)
+  }
+}
+
+// How many products have a cached rating, for the popup.
+export async function countCachedRatings(): Promise<number> {
+  return (await ratingKeys()).filter((key) => !key.endsWith(META_KEY_SUFFIX))
+    .length
+}
+
 // tryGetRating only evicts an entry when its own product is revisited after
 // expiry; without a sweep, entries for products never seen again pile up
 // forever — and since responses carry base64 label images they would
@@ -168,5 +183,11 @@ function knowsMoreThanCached(
     !FACT_KEYS.some(
       (key) => cached(key) !== undefined && ratingRequest[key] === undefined
     )
+  )
+}
+
+async function ratingKeys(): Promise<string[]> {
+  return Object.keys(await browser.storage.local.get(null)).filter((key) =>
+    key.startsWith(RATINGS_KEY_PREFIX)
   )
 }

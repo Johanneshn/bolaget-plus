@@ -1,6 +1,11 @@
 import browser from 'webextension-polyfill'
 
 import {
+  clearPinnedMatches,
+  countPinnedMatches
+} from '@/components/pinnedMatches'
+import { clearRatings, countCachedRatings } from '@/components/ratingsCache'
+import {
   beerFeatureEnabled,
   ciderFeatureEnabled,
   featuresEnabled,
@@ -10,9 +15,32 @@ import {
 // Sourced from the manifest, which WXT generates from package.json's version.
 const version = browser.runtime.getManifest().version
 
+async function bindCount(
+  labelId: string,
+  buttonId: string,
+  count: () => Promise<number>,
+  clear: () => Promise<void>,
+  describe: (count: number) => string
+): Promise<void> {
+  const label = document.getElementById(labelId)
+  const button = document.getElementById(buttonId) as HTMLButtonElement | null
+  if (!label || !button) return
+
+  const render = async () => {
+    const value = await count()
+    label.textContent = describe(value)
+    button.disabled = value === 0
+  }
+  button.addEventListener('click', () => {
+    void clear().then(render)
+  })
+  await render()
+}
+
 async function initialize(): Promise<void> {
   showVersion()
   await setupToggles()
+  await setupStoredData()
 
   const shareButton = document.getElementById('shareButton')
   if (shareButton) {
@@ -20,6 +48,27 @@ async function initialize(): Promise<void> {
       void shareExtension()
     })
   }
+}
+
+// What the extension keeps on this device: the day-long rating cache, and the
+// matches the user picked by hand. Either can be cleared from here — the cache
+// to force fresh lookups, the picks to hand every product back to automatic
+// matching.
+async function setupStoredData(): Promise<void> {
+  await bindCount(
+    'ratingsCount',
+    'clearRatings',
+    countCachedRatings,
+    clearRatings,
+    (count) => `${count.toString()} sparade betyg`
+  )
+  await bindCount(
+    'pinsCount',
+    'clearPins',
+    countPinnedMatches,
+    clearPinnedMatches,
+    (count) => `${count.toString()} ${count === 1 ? 'eget val' : 'egna val'}`
+  )
 }
 
 async function setupToggles(): Promise<void> {

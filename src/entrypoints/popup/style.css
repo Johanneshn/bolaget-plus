@@ -135,3 +135,33 @@ input:checked + .slider:before {
 .donate-link:hover {
   text-decoration: underline;
 }
+.data {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.805);
+  font-size: 13px;
+}
+.data-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.text-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: white;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.text-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
