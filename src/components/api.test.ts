@@ -303,6 +303,84 @@ describe('fetchRatingFromVivino', () => {
     expect(result.transient).toBeUndefined()
   })
 
+  it('returns the per-vintage ratings for a product page', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            id: 1,
+            name: 'Pinot Noir',
+            statistics: { ratings_average: 4, ratings_count: 98172 },
+            vintages: [
+              {
+                id: 10,
+                statistics: { ratings_average: 4, ratings_count: 98172 },
+                year: 'U.V.'
+              },
+              {
+                id: 25,
+                statistics: { ratings_average: 0, ratings_count: 4 },
+                year: '2025'
+              },
+              {
+                id: 24,
+                statistics: { ratings_average: 3.9, ratings_count: 846 },
+                year: 2024
+              }
+            ],
+            winery: { name: 'Bread & Butter' }
+          }
+        ],
+        nbHits: 100
+      })
+    )
+
+    const result = await fetchRatingFromVivino(
+      'Bread & Butter Pinot Noir',
+      true,
+      {},
+      () => Promise.resolve(undefined)
+    )
+
+    // The all-vintages "U.V." entry is the pooled rating itself; a vintage
+    // below Vivino's threshold is kept with rating 0 so the page can say so.
+    expect(result.vintages).toEqual([
+      { id: 25, rating: 0, votes: 4, year: '2025' },
+      { id: 24, rating: 3.9, votes: 846, year: '2024' }
+    ])
+  })
+
+  it('leaves the vintages out of a list-card lookup', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        hits: [
+          {
+            id: 1,
+            name: 'Pinot Noir',
+            statistics: { ratings_average: 4, ratings_count: 98172 },
+            vintages: [
+              {
+                id: 24,
+                statistics: { ratings_average: 3.9, ratings_count: 846 },
+                year: '2024'
+              }
+            ],
+            winery: { name: 'Bread & Butter' }
+          }
+        ],
+        nbHits: 100
+      })
+    )
+
+    const result = await fetchRatingFromVivino(
+      'Bread & Butter Pinot Noir',
+      false
+    )
+
+    expect(result.status).toBe(RatingResultStatus.Found)
+    expect(result.vintages).toBeUndefined()
+  })
+
   it('marks HTTP errors as transient so they are never cached', async () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 429 }))
 

@@ -1,3 +1,4 @@
+allVintages: all vintages
 brewery: Brewery
 closestMatches: Closest matches
 linkToUntappd: Link to Untappd
@@ -11,4 +12,5 @@ rating: Rating
 searchAtUntappd: Search at Untappd
 searchAtVivino: Search at Vivino
 uncertainMatch: Could not find an exact match, you can search yourself via the link below.
+vintage: Vintage
 votes: votes
