@@ -265,7 +265,7 @@ export async function fetchRatingFromUntappd(
           link: `https://untappd.com/b/${hit.beer_slug}/${hit.bid.toString()}`,
           name: hit.beer_name,
           // Untappd reports no score (null or 0) for beers with too few
-          // check-ins; normalize to 0 so the UI can render it as "N/A".
+          // check-ins; normalize to 0 so the UI can render it as "no score yet".
           rating: hit.rating_score ?? 0,
           similarityRate,
           status: RatingResultStatus.Found,

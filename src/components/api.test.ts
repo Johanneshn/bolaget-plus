@@ -433,7 +433,7 @@ describe('fetchRatingFromUntappd', () => {
     expect((result as BeerResponse).brewery).toBe('Pabst Brewing Company')
   })
 
-  it('normalizes a missing score to 0 for the N/A rendering', async () => {
+  it('normalizes a missing score to 0 for the no-score rendering', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
         hits: [
