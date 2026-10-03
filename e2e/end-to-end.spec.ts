@@ -146,7 +146,9 @@ test('visiting a wine page shows rating-container with ratings and stars', async
   expect(ratingText).toMatch(/(votes|röster)/i)
 
   // Check for the Vivino link
-  const vivinoLink = ratingContainer.locator('a[href*="vivino.com"]')
+  // The card links to Vivino more than once (the vintage line, the
+  // runners-up); the one asserted here is the main link to the match.
+  const vivinoLink = ratingContainer.locator('a.bp-link[href*="vivino.com"]')
   await expect(vivinoLink).toBeVisible()
 })
 
