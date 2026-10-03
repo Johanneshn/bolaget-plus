@@ -55,26 +55,32 @@
                 <span id="pinsCount"></span>
                 <button type="button" class="text-button" id="clearPins">Rensa</button>
             </div>
-            <div class="data-row">
-                <span id="tastedCount"></span>
-                <span class="data-actions">
-                    <button type="button" class="text-button" id="exportTasted">Exportera</button>
-                    <label class="text-button file-button">
-                        Importera
-                        <input type="file" id="tastedFile" accept=".json,application/json">
-                    </label>
-                    <button type="button" class="text-button" id="clearTasted">Rensa</button>
-                </span>
+            <div class="data-group">
+                <div class="data-row">
+                    <span id="tastedCount"></span>
+                    <span class="data-actions">
+                        <button type="button" class="text-button" id="exportTasted">Spara som fil</button>
+                        <label class="text-button file-button">
+                            Läs in fil
+                            <input type="file" id="tastedFile" accept=".json,application/json" aria-describedby="tastedHint">
+                        </label>
+                        <button type="button" class="text-button" id="clearTasted">Rensa</button>
+                    </span>
+                </div>
+                <p class="hint" id="tastedHint">Det du markerat som provat. Spara listan som fil och läs in den i en annan webbläsare, till exempel i mobilen.</p>
             </div>
-            <div class="data-row">
-                <span id="untappdCount"></span>
-                <span class="data-actions">
-                    <label class="text-button file-button">
-                        Importera
-                        <input type="file" id="untappdFile" accept=".json,.csv,application/json,text/csv">
-                    </label>
-                    <button type="button" class="text-button" id="clearUntappd">Rensa</button>
-                </span>
+            <div class="data-group">
+                <div class="data-row">
+                    <span id="untappdCount"></span>
+                    <span class="data-actions">
+                        <label class="text-button file-button">
+                            Läs in fil
+                            <input type="file" id="untappdFile" accept=".json,.csv,application/json,text/csv" aria-describedby="untappdHint">
+                        </label>
+                        <button type="button" class="text-button" id="clearUntappd">Rensa</button>
+                    </span>
+                </div>
+                <p class="hint" id="untappdHint">Läs in din incheckningshistorik från Untappd (JSON eller CSV), så märks öl du redan druckit som provade. Exporten ingår i Untappd Insider. <a href="https://help.untappd.com/hc/en-us/articles/360034506171-Where-can-I-find-the-Exportable-Data-feature" target="_blank" rel="noopener noreferrer">Så hämtar du filen</a></p>
             </div>
         </section>
 
