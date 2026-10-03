@@ -7,8 +7,9 @@ import {
   RatingResponse,
   RatingResultStatus
 } from '@/@types/types'
+import { pinMatch, unpinMatch } from '@/components/pinnedMatches'
 import { saveRating } from '@/components/ratingsCache'
-import { enqueueListFetch } from '@/components/ratingService'
+import { enqueueListFetch, fetchRating } from '@/components/ratingService'
 
 const request: RatingRequest = {
   includeImage: false,
@@ -100,5 +101,42 @@ describe('enqueueListFetch', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+})
+
+describe('a match the user picked by hand', () => {
+  beforeEach(() => {
+    fakeBrowser.reset()
+    vi.restoreAllMocks()
+  })
+
+  const pick = {
+    link: 'https://www.vivino.com/wines/2',
+    name: 'The Right Wine',
+    rating: 3.7,
+    votes: 55
+  }
+
+  it('wins over the cached automatic match, on the page and on a card', async () => {
+    await saveRating(request, rating)
+    await pinMatch(request.productId, pick)
+
+    const expected = { ...pick, pinned: true, status: RatingResultStatus.Found }
+    await expect(
+      fetchRating(request.productId, request.productName, ProductType.Wine)
+    ).resolves.toMatchObject(expected)
+    await expect(
+      enqueueListFetch(request.productId, request.productName, ProductType.Wine)
+    ).resolves.toMatchObject(expected)
+  })
+
+  it('gives way to the automatic match again once undone', async () => {
+    await saveRating(request, rating)
+    await pinMatch(request.productId, pick)
+    await unpinMatch(request.productId)
+
+    await expect(
+      fetchRating(request.productId, request.productName, ProductType.Wine)
+    ).resolves.toEqual(rating)
   })
 })

@@ -10,7 +10,8 @@ import {
 import {
   injectCardSpinner,
   replaceCardSpinner,
-  setRating
+  setRating,
+  setUncertain
 } from '@/components/domUtils'
 
 function badge(card: Element, rating: number, votes: number): string {
@@ -114,5 +115,87 @@ describe('setRating', () => {
     setRating(ProductType.Wine, rating, rating.link, '2019')
 
     expect(document.querySelector('.bp-vintage')).toBeNull()
+  })
+})
+
+describe('correcting a match', () => {
+  function renderProductPage(): void {
+    document.body.innerHTML = '<main><h1><span>Amadio</span></h1></main>'
+  }
+
+  const runnerUp = {
+    link: 'https://www.vivino.com/wines/2',
+    name: 'The Right Wine',
+    rating: 3.7,
+    votes: 55
+  }
+
+  it('offers the runners-up behind a folded "wrong match" toggle', () => {
+    renderProductPage()
+    const chosen: unknown[] = []
+    setRating(
+      ProductType.Wine,
+      {
+        alternatives: [runnerUp],
+        link: 'https://www.vivino.com/wines/1',
+        name: 'Amadio',
+        rating: 4,
+        status: RatingResultStatus.Found,
+        votes: 10
+      },
+      null,
+      null,
+      { onChoose: (pick) => chosen.push(pick) }
+    )
+
+    const list = document.querySelector<HTMLElement>(
+      '.bp-correction .bp-alt-list'
+    )
+    expect(list?.hidden).toBe(true)
+    document
+      .querySelector<HTMLButtonElement>('.bp-correction > button')
+      ?.click()
+    expect(list?.hidden).toBe(false)
+
+    document.querySelector<HTMLButtonElement>('.bp-choose')?.click()
+    expect(chosen).toEqual([runnerUp])
+  })
+
+  it('lets the user undo a pick', () => {
+    renderProductPage()
+    let undone = false
+    setRating(
+      ProductType.Wine,
+      { ...runnerUp, pinned: true, status: RatingResultStatus.Found },
+      runnerUp.link,
+      null,
+      { onUndo: () => (undone = true) }
+    )
+
+    expect(document.querySelector('.bp-correction')?.textContent).toBe(
+      'yourPick · undo'
+    )
+    document.querySelector<HTMLButtonElement>('.bp-correction button')?.click()
+    expect(undone).toBe(true)
+  })
+
+  it('lets the user pick an alternative when the match is uncertain', () => {
+    renderProductPage()
+    const chosen: unknown[] = []
+    setUncertain(
+      ProductType.Wine,
+      {
+        alternatives: [runnerUp],
+        link: 'https://www.vivino.com/search/wines?q=amadio',
+        name: null,
+        rating: 0,
+        status: RatingResultStatus.Uncertain,
+        votes: 0
+      },
+      (pick) => chosen.push(pick)
+    )
+
+    document.querySelector<HTMLButtonElement>('.bp-choose')?.click()
+    expect(chosen).toEqual([runnerUp])
   })
 })

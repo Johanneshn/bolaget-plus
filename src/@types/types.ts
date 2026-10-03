@@ -53,10 +53,15 @@ export type RatingRequest = ProductFacts & {
 }
 
 export interface RatingResponse {
+  // The ranked candidates: "did you mean" on an uncertain match, and the
+  // runners-up behind a found one, for the user to correct it with.
   alternatives?: RatingAlternative[]
   imageDataUrl?: string
   link: null | string
   name: null | string
+  // Set on a match the user picked by hand (pinnedMatches.ts), never by a
+  // lookup.
+  pinned?: boolean
   rating: number
   status: RatingResultStatus
   // Set when the result reflects a transient failure (rate limit, network
