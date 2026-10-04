@@ -20,16 +20,6 @@ export default defineBackground(() => {
   // throttles itself, since reading the whole cache on every restart is not
   // free.
   void removeExpiredRatings().catch(() => undefined)
-
-  // A first install opens a page that shows what the extension does; most of
-  // it is otherwise only found by stumbling on it. Updates stay silent.
-  browser.runtime.onInstalled.addListener(({ reason }) => {
-    if (reason === 'install') {
-      void browser.tabs.create({
-        url: browser.runtime.getURL('/welcome.html')
-      })
-    }
-  })
 })
 
 function isGetRatingMessage(message: unknown): message is RatingRequest {
