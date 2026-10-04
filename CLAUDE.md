@@ -113,10 +113,6 @@ four `sync:`-scoped storage items in `settings.ts` (`featuresEnabled`,
 `wineFeatureEnabled`, `beerFeatureEnabled`, `ciderFeatureEnabled`, all default
 `true`). The content script reads these before doing any work.
 
-**Welcome page** (`entrypoints/welcome/`) is a static page the background
-script opens on first install (not on updates) to show what the extension
-does; it shares the popup's look.
-
 **Shared types** live in `src/@types/types.ts` — `ProductType` and
 `RatingResultStatus` enums plus the `RatingRequest`/`RatingResponse` message
 contract used across the process boundary.
