@@ -102,6 +102,17 @@ export function getCardProductType(card: Element): ProductType {
 // confirm a winery with. Only the embedded page data carries it, so it is
 // missing after an SPA navigation to a product the loaded payload never held —
 // the lookup then falls back to judging the title alone, as it always has.
+// The result count the site prints above a list ("139 varor", "1 vara"), or
+// null when there is none on the page.
+export function getListCount(): null | number {
+  for (const element of document.querySelectorAll('main *')) {
+    if (element.children.length > 0) continue
+    const count = /^(\d[\d\s]*)\s+var(?:a|or)$/.exec(element.textContent.trim())
+    if (count) return Number(count[1].replace(/\s/g, ''))
+  }
+  return null
+}
+
 export function getProducer(productId: string): null | string {
   return getProductFromPageData(productId)?.producer ?? null
 }
@@ -183,6 +194,27 @@ const NON_BOTTLE_PATTERN = new RegExp(
   'iu'
 )
 
+// Turns the two title lines Systembolaget renders — the name and a subtitle
+// that ends in the vintage ("Brunello di Montalcino, 2021", or just "2021") —
+// into the name searched for on Vivino/Untappd. Both the product page and a
+// list card go through here: they used to derive the query differently, one
+// dropping the vintage and one keeping it, so the same wine was badged with
+// two different Vivino entries depending on which view it was read from.
+// The vintage is dropped because Vivino indexes a wine under one name for all
+// its vintages — the year is absent from every hit's name, so carrying it into
+// the query only drags the name similarity down, blocks an exact-name match,
+// and shifts Algolia's ranking towards unrelated wines. The rating displayed
+// is Vivino's pooled wine-level average across vintages either way.
+export function buildSearchName(name: string, subtitle: string): string {
+  const withoutVintage = subtitle.includes(',')
+    ? subtitle.slice(0, subtitle.lastIndexOf(',')).trim()
+    : subtitle.trim()
+
+  return VINTAGE_ONLY.test(withoutVintage)
+    ? name.trim()
+    : `${name} ${withoutVintage}`.trim()
+}
+
 export function isBottle(): boolean {
   const main = document.querySelector('main')
   if (main == null) {
@@ -200,6 +232,12 @@ export function isBottle(): boolean {
   }
 
   return !isNonBottlePackaging(descriptor)
+}
+
+// Whether a packaging name from the product search ("Glasflaska", "Box",
+// "PET-flaska") is a bottle Vivino rates.
+export function isBottlePackaging(packaging: string): boolean {
+  return !isNonBottlePackaging(packaging.toLowerCase())
 }
 
 // The list-page counterpart of isBottle(): a card links straight to the product
@@ -283,27 +321,6 @@ function buildProductMap(raw: string): Map<string, PageProduct> {
   }
 
   return map
-}
-
-// Turns the two title lines Systembolaget renders — the name and a subtitle
-// that ends in the vintage ("Brunello di Montalcino, 2021", or just "2021") —
-// into the name searched for on Vivino/Untappd. Both the product page and a
-// list card go through here: they used to derive the query differently, one
-// dropping the vintage and one keeping it, so the same wine was badged with
-// two different Vivino entries depending on which view it was read from.
-// The vintage is dropped because Vivino indexes a wine under one name for all
-// its vintages — the year is absent from every hit's name, so carrying it into
-// the query only drags the name similarity down, blocks an exact-name match,
-// and shifts Algolia's ranking towards unrelated wines. The rating displayed
-// is Vivino's pooled wine-level average across vintages either way.
-function buildSearchName(name: string, subtitle: string): string {
-  const withoutVintage = subtitle.includes(',')
-    ? subtitle.slice(0, subtitle.lastIndexOf(',')).trim()
-    : subtitle.trim()
-
-  return VINTAGE_ONLY.test(withoutVintage)
-    ? name.trim()
-    : `${name} ${withoutVintage}`.trim()
 }
 
 function extractProductId(url: string): null | string {

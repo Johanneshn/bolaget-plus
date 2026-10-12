@@ -1,7 +1,9 @@
 allVintages: alla årgångar
 brewery: Bryggeri
+cancel: Avbryt
 checkedInOnUntappd: Incheckad på Untappd
 choose: Välj
+close: Stäng
 closestMatches: Närmaste träffar
 hideTasted: Dölj provade
 linkToUntappd: Länk till Untappd
@@ -16,9 +18,22 @@ rating: Betyg
 searchAtUntappd: Sök hos Untappd
 searchAtVivino: Sök hos Vivino
 sort: Sortera
+sortPage: Sortera sidan
 sortRating: Betyg
 sortValue: Prisvärt
 tasted: Provad
+topList: Topp 10
+topListEmpty: Hittade inga betyg för de här produkterna.
+topListFailed: Kunde inte hämta sortimentet.
+topListFetching: Hämtar sortimentet
+topListFootRated: produkter hade ett betyg att ranka på.
+topListFootSkipped: boxar och påsar räknas inte – Vivino betygsätter bara flaskor.
+topListFootTasted: provade är dolda.
+topListNoSearch: Hittade ingen sökning att ranka. Ändra ett filter och försök igen.
+topListRating: Hämtar betyg
+topListRunAnyway: Kör ändå
+topListSlow: produkter. Att hämta betyg för alla kan ta flera minuter – välj en butik eller fler filter för att korta listan, eller kör ändå.
+topListTooMany: produkter är för många att ranka. Välj en butik eller fler filter så att listan blir högst
 uncertainMatch: Kunde inte hitta en exakt matchning, du kan själv söka via länken nedan.
 undo: Ångra
 vintage: Årgång

@@ -1,4 +1,5 @@
 import type { TastedSource } from '@/components/tasted'
+import type { TopListEntry } from '@/components/topList'
 
 import {
   BeerResponse,
@@ -318,6 +319,15 @@ const STYLES = `
     color: ${FG};
     font-size: 14px;
   }
+  .bp-brand {
+    margin-right: auto;
+    font-family: var(--font-bolaget-medium-condensed, inherit);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: ${PRIMARY};
+  }
   .bp-filter {
     display: flex;
     align-items: center;
@@ -346,6 +356,130 @@ const STYLES = `
     border-color: ${PRIMARY};
     background: ${PRIMARY};
     color: var(--primary-foreground, #ffffff);
+  }
+  .bp-top {
+    margin: 0 16px 16px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    background: ${MUTED_BG};
+    color: ${FG};
+    font-size: 14px;
+  }
+  .bp-top-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .bp-top-header h2 {
+    margin: 0;
+    font-family: var(--font-bolaget-medium-condensed, inherit);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: ${PRIMARY};
+  }
+  .bp-top-header button {
+    padding: 4px 10px;
+    border: 0;
+    background: transparent;
+    color: ${MUTED_FG};
+    font: inherit;
+    cursor: pointer;
+  }
+  .bp-top-status {
+    margin: 8px 0 0;
+    color: ${MUTED_FG};
+  }
+  .bp-sort .bp-top-button {
+    margin-left: 8px;
+    border-color: ${PRIMARY};
+    background: ${PRIMARY};
+    color: var(--primary-foreground, #ffffff);
+  }
+  .bp-sort .bp-top-button:hover {
+    border-color: ${FG};
+    background: ${FG};
+  }
+  .bp-top-run {
+    margin-top: 10px;
+    min-height: 36px;
+    padding: 6px 14px;
+    border: 1px solid var(--border-strong, #26262640);
+    border-radius: 999px;
+    background: transparent;
+    color: ${FG};
+    font: inherit;
+    cursor: pointer;
+  }
+  .bp-top-run:hover { border-color: ${FG}; }
+  .bp-top progress {
+    display: block;
+    width: 100%;
+    height: 6px;
+    margin-top: 8px;
+    accent-color: ${PRIMARY};
+  }
+  .bp-top ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .bp-top li {
+    display: grid;
+    grid-template-columns: 2ch 1fr auto;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 8px 0;
+    border-top: 1px solid ${BORDER};
+  }
+  .bp-top li:first-child { border-top: 0; }
+  .bp-top-rank {
+    color: ${MUTED_FG};
+    font-variant-numeric: tabular-nums;
+  }
+  .bp-top-name {
+    color: ${FG};
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .bp-top-name:hover { text-decoration: underline; }
+  .bp-top-details {
+    color: ${MUTED_FG};
+    font-size: 12px;
+  }
+  .bp-top-tasted {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: ${PRIMARY};
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .bp-top-tasted svg { width: 13px; height: 13px; }
+  .bp-top-rating {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  .bp-top-rating svg { width: 14px; height: 14px; }
+  .bp-top-rating {
+    color: ${FG};
+    text-decoration: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .bp-top-rating .bp-card-score {
+    min-width: 3ch;
+    font-weight: 700;
+    text-align: right;
+  }
+  .bp-top-rating .bp-card-votes {
+    min-width: 9ch;
+    color: ${MUTED_FG};
+    font-size: 12px;
   }
   .bp-card-spinner-inline {
     display: inline-block;
@@ -996,7 +1130,8 @@ export function clearStaleCard(card: Element, productId: string): void {
 export function ensureListControls(
   list: Element,
   view: ListView,
-  onChange: (view: ListView, list: Element) => void
+  onChange: (view: ListView, list: Element) => void,
+  onTopList?: (list: Element) => void
 ): void {
   ensureStyles()
   let control = list.previousElementSibling as HTMLElement | null
@@ -1011,9 +1146,11 @@ export function ensureListControls(
     const sort = document.createElement('div')
     sort.className = 'bp-filter'
     sort.setAttribute('role', 'group')
-    sort.setAttribute('aria-label', t('sort'))
+    // "Sortera sidan": these reorder the cards loaded so far, unlike Topp 10,
+    // which ranks everything the filters match.
+    sort.setAttribute('aria-label', t('sortPage'))
     const sortLabel = document.createElement('span')
-    sortLabel.textContent = `${t('sort')}:`
+    sortLabel.textContent = `${t('sortPage')}:`
     sortLabel.setAttribute('aria-hidden', 'true')
     sort.appendChild(sortLabel)
     for (const [sortBy, text] of [
@@ -1044,7 +1181,22 @@ export function ensureListControls(
       onChange({ ...view, hideTasted: !view.hideTasted }, listOf())
     })
 
-    control.append(hideTasted, sort)
+    // The site's own sort and filter controls sit right above; this says
+    // which buttons are ours.
+    const brand = document.createElement('span')
+    brand.className = 'bp-brand'
+    brand.textContent = 'Bolaget+'
+    control.append(brand, hideTasted, sort)
+    if (onTopList) {
+      const top = document.createElement('button')
+      top.type = 'button'
+      top.className = 'bp-top-button'
+      top.textContent = t('topList')
+      top.addEventListener('click', () => {
+        onTopList(listOf())
+      })
+      control.append(top)
+    }
     list.before(control)
   }
 
@@ -1105,6 +1257,42 @@ export function markCardTasted(card: Element, tasted: boolean): void {
   after?.insertAdjacentElement('afterend', mark)
 }
 
+// The "Topp 10" panel, between the list controls and the list. One per page:
+// opening it again starts over in the same panel.
+export function openTopListPanel(
+  list: Element,
+  onClose: () => void
+): HTMLElement {
+  ensureStyles()
+  document.querySelector('.bp-top')?.remove()
+  const panel = document.createElement('section')
+  panel.className = 'bp-top'
+  panel.setAttribute('aria-live', 'polite')
+
+  const header = document.createElement('div')
+  header.className = 'bp-top-header'
+  const heading = document.createElement('h2')
+  heading.textContent = `Bolaget+ · ${t('topList')}`
+  const close = document.createElement('button')
+  close.type = 'button'
+  close.className = 'bp-top-close'
+  close.textContent = t('close')
+  close.addEventListener('click', () => {
+    panel.remove()
+    onClose()
+  })
+  header.append(heading, close)
+
+  const body = document.createElement('div')
+  body.className = 'bp-top-body'
+  panel.append(header, body)
+  // Before the controls when there are some, so the panel reads as their
+  // result rather than as part of the list.
+  const control = list.previousElementSibling
+  ;(control?.classList.contains('bp-sort') ? control : list).before(panel)
+  return panel
+}
+
 export function replaceCardSpinner(
   card: Element,
   spinner: HTMLElement,
@@ -1136,6 +1324,124 @@ export function replaceCardSpinner(
   if (getCardProductId(card) !== productId) return
   ;(card as HTMLElement).dataset.bpRating = rating.rating.toString()
   findCardAnchor(card)?.insertAdjacentElement('afterend', badge)
+}
+
+// Puts the size of the list Topp 10 would rank on its button ("Topp 10 av
+// 126"), so it reads as covering the whole filter — and shows before the click
+// whether the list is a long one.
+export function setTopListButtonCount(list: Element, count: null | number) {
+  const button = list.previousElementSibling?.querySelector('.bp-top-button')
+  if (!button) return
+  button.textContent =
+    count === null
+      ? t('topList')
+      : `${t('topList')} ${t('of')} ${formatCount(count)}`
+}
+
+// Stops at the total before a long run, for the user to narrow the list or
+// go ahead anyway.
+export function setTopListConfirm(
+  panel: HTMLElement,
+  text: string,
+  onConfirm: () => void
+): void {
+  const run = document.createElement('button')
+  run.type = 'button'
+  run.className = 'bp-top-run'
+  run.textContent = t('topListRunAnyway')
+  run.addEventListener('click', onConfirm)
+  setTopListBody(panel, [createTopListText(text), run], false)
+}
+
+// A run in progress: what it is doing and how far it has come. Without a total
+// the bar shows activity only.
+export function setTopListProgress(
+  panel: HTMLElement,
+  text: string,
+  done = 0,
+  total = 0
+): void {
+  const bar = document.createElement('progress')
+  if (total > 0) {
+    bar.max = total
+    bar.value = done
+  }
+  bar.setAttribute('aria-label', text)
+  setTopListBody(panel, [createTopListText(text), bar], true)
+}
+
+export function setTopListResults(
+  panel: HTMLElement,
+  entries: TopListEntry[],
+  footnote: string
+): void {
+  const body = panel.querySelector('.bp-top-body')
+  if (!body) return
+  if (entries.length === 0) {
+    setTopListStatus(panel, t('topListEmpty'))
+    return
+  }
+
+  const list = document.createElement('ol')
+  entries.forEach((entry, index) => {
+    const { product, rating } = entry
+    const item = document.createElement('li')
+    const rank = document.createElement('span')
+    rank.className = 'bp-top-rank'
+    rank.textContent = String(index + 1)
+
+    const text = document.createElement('div')
+    const name = document.createElement('a')
+    name.className = 'bp-top-name'
+    name.href = product.url
+    name.textContent = product.title
+    const details = document.createElement('div')
+    details.className = 'bp-top-details'
+    details.textContent = [
+      product.price > 0 ? `${formatPrice(product.price)}:-` : null,
+      product.volumeMl > 0 ? `${formatCount(product.volumeMl)} ml` : null,
+      // The name it was matched to, so a wrong match is visible at a glance.
+      rating.name
+        ? `${product.type === ProductType.Wine ? 'Vivino' : 'Untappd'}: ${rating.name}`
+        : null
+    ]
+      .filter(Boolean)
+      .join(' · ')
+    text.append(name, details)
+    if (entry.tasted) {
+      const tasted = document.createElement('span')
+      tasted.className = 'bp-top-tasted'
+      tasted.append(createCheckIcon(), t('tasted'))
+      text.append(tasted)
+    }
+
+    const score = document.createElement(rating.link ? 'a' : 'span')
+    score.className = 'bp-top-rating'
+    if (score instanceof HTMLAnchorElement && rating.link) {
+      score.href = rating.link
+      score.target = '_blank'
+      score.rel = 'noopener noreferrer'
+    }
+    score.setAttribute('aria-label', ratingLabel(rating))
+    const votes = document.createElement('span')
+    votes.className = 'bp-card-votes'
+    votes.textContent = `(${formatCount(rating.votes)})`
+    score.append(
+      createRatingIcons(product.type, rating.rating),
+      createScore(rating.rating, 'bp-card-score'),
+      votes
+    )
+
+    item.append(rank, text, score)
+    list.append(item)
+  })
+
+  setTopListBody(panel, [list, createTopListText(footnote)], false)
+}
+
+// A one-line end state of the panel: why there is nothing to show.
+export function setTopListStatus(panel: HTMLElement, text: string): void {
+  setTopListBody(panel, [createTopListText(text)], false)
 }
 
 // How much better each card is rated than is usual for its price, in rating
@@ -1201,6 +1507,18 @@ function setStyle(
   }
 }
 
+// Fills the panel. While a run is going its close button cancels the run, and
+// says so.
+function setTopListBody(
+  panel: HTMLElement,
+  content: Node[],
+  running: boolean
+): void {
+  panel.querySelector('.bp-top-body')?.replaceChildren(...content)
+  const close = panel.querySelector('.bp-top-close')
+  if (close) close.textContent = t(running ? 'cancel' : 'close')
+}
+
 // Scores and counts the way the Swedish page around them writes numbers:
 // "3,9" and "98 172", not "3.9" and "98172".
 const scoreFormat = new Intl.NumberFormat('sv-SE', {
@@ -1208,6 +1526,7 @@ const scoreFormat = new Intl.NumberFormat('sv-SE', {
   minimumFractionDigits: 1
 })
 const countFormat = new Intl.NumberFormat('sv-SE')
+const priceFormat = new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 2 })
 
 // Shown where the source has too few ratings for a score; the reason is in
 // the title and the screen-reader label.
@@ -1228,6 +1547,13 @@ function createScore(score: number, className: string): HTMLElement {
   return element
 }
 
+function createTopListText(text: string): HTMLElement {
+  const status = document.createElement('p')
+  status.className = 'bp-top-status'
+  status.textContent = text
+  return status
+}
+
 // The line a card's badge goes under: the "750 ml · 13 % vol. · Nr 223701"
 // details below the name. Located by its data-slot name, which — unlike the
 // utility class names around it — says what the element is.
@@ -1237,6 +1563,10 @@ function findCardAnchor(card: Element): Element | null {
 
 function formatCount(count: number): string {
   return countFormat.format(count)
+}
+
+function formatPrice(price: number): string {
+  return priceFormat.format(price)
 }
 
 function formatScore(score: number): string {

@@ -308,6 +308,9 @@ describe('sorting a result list', () => {
       changes.push(view)
     )
 
+    expect(document.querySelector('.bp-filter span')?.textContent).toBe(
+      'Sortera sidan:'
+    )
     const buttons = [
       ...document.querySelectorAll<HTMLButtonElement>('.bp-sort button')
     ]

@@ -125,7 +125,8 @@ export async function enqueueListFetch(
   productId: string,
   productName: string,
   type: ProductType,
-  facts: ProductFacts = {}
+  facts: ProductFacts = {},
+  signal?: AbortSignal
 ): Promise<RatingResponse> {
   // Cached ratings render immediately — only real network fetches go through
   // the throttled queue, so a revisited list page fills in instantly instead
@@ -148,6 +149,19 @@ export async function enqueueListFetch(
   const task = listFetchQueue.then(
     () =>
       new Promise<RatingResponse>((resolve) => {
+        // A cancelled "Topp 10" run leaves its place in the queue at once, so
+        // it does not hold up the badges queued behind it.
+        if (signal?.aborted) {
+          resolve({
+            link: null,
+            name: null,
+            rating: 0,
+            status: RatingResultStatus.NotFound,
+            transient: true,
+            votes: 0
+          })
+          return
+        }
         setTimeout(() => {
           void fetchRating(productId, productName, type, false, facts).then(
             resolve
