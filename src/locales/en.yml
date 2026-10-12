@@ -41,7 +41,8 @@ topListIncomplete: Ratings could not be fetched for {count}, so the list may be 
 topListLoading: Fetching the products in the selection – {done} of {total}
 topListNoSearch: Could not read the selection. Reload the page and try again.
 topListNoneFetched: No ratings could be fetched.
-topListPaused: Searches on {source} are paused until {time} – it is not answering right now, probably because we searched too much in a short time.
+topListNothingToRank: Nothing in the selection can be ranked – Top 10 covers bottled wine, beer and cider.
+topListPaused: Right now {source} is not answering, probably because we searched too much in a short time. Bolaget+ holds off new searches there until {time}.
 topListRating: Fetching ratings – {done} of {total}
 topListRatingFailed: Fetching ratings – {done} of {total} ({failed} failed)
 topListReading: Reading the selection …

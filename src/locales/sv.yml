@@ -41,7 +41,8 @@ topListIncomplete: Betyg kunde inte hämtas för {count}, så listan kan sakna v
 topListLoading: Hämtar varorna i urvalet – {done} av {total}
 topListNoSearch: Kunde inte läsa av urvalet. Ladda om sidan och försök igen.
 topListNoneFetched: Inga betyg kunde hämtas.
-topListPaused: Sökningarna mot {source} är pausade till kl. {time} – sidan svarar inte just nu, troligen för att vi sökt för mycket på kort tid.
+topListNothingToRank: Inga varor i urvalet går att rangordna – Topp 10 gäller vin på flaska, öl och cider.
+topListPaused: Just nu svarar {source} inte, troligen för att vi sökt för mycket på kort tid. Bolaget+ väntar med nya sökningar dit till kl. {time}.
 topListRating: Hämtar betyg – {done} av {total}
 topListRatingFailed: Hämtar betyg – {done} av {total} ({failed} misslyckades)
 topListReading: Läser av urvalet …

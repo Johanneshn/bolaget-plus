@@ -46,8 +46,8 @@ interface SavedTopList {
   listCount: number
   // Products looked up: in the range, of a type switched on, bottles if wine.
   looked: number
-  // Until when the run was cut short by a paused rating site; 0 if it was not.
-  pausedUntil: number
+  // The rating sites that paused the run, and until when.
+  paused: Partial<Record<string, number>>
   savedAt: number
   // The search replayed, which carries the store the URL does not.
   searchUrl: string
@@ -85,7 +85,9 @@ export function checkTopList(hooks: TopListHooks): void {
     if (list) restoreTopList(list, hooks)
     return
   }
-  if (!shown.panel.isConnected && list) placePanel(shown.panel, list)
+  if (!shown.panel.isConnected && list) {
+    domUtils.placeTopListPanel(shown.panel, list)
+  }
   const count = productUtils.getListCount()
   // The count goes missing while the site loads new results; that is not a
   // change yet.
@@ -93,8 +95,15 @@ export function checkTopList(hooks: TopListHooks): void {
     currentHref() !== shown.href ||
     (count !== null && count !== shown.listCount)
   if (changed && !shown.changed) {
+    // Nothing was made for the old list (it failed, or found no search):
+    // there is nothing to keep, and its message is about another list.
+    if (!shown.saved && !activeRun) {
+      shown.panel.remove()
+      shown = null
+      return
+    }
     shown.changed = true
-    activeRun?.abort()
+    endRun()
     render(shown, hooks, {
       actions: [
         {
@@ -129,11 +138,15 @@ export async function runTopList(
   list: Element,
   hooks: TopListHooks
 ): Promise<void> {
-  if (activeRun && !activeRun.signal.aborted) return
-  if (!(await featuresEnabled.getValue())) return
+  if (activeRun) return
+  // Claimed before the first await, so a double click starts one run.
   const run = new AbortController()
   activeRun = run
   domUtils.setTopListButtonBusy(true)
+  if (!(await featuresEnabled.getValue())) {
+    endRun()
+    return
+  }
   saveTopList(null)
   const listCount = productUtils.getListCount()
   const current: Shown = {
@@ -145,15 +158,35 @@ export async function runTopList(
   try {
     await rankList(current, run, hooks)
   } finally {
-    if (activeRun === run) {
-      activeRun = null
-      domUtils.setTopListButtonBusy(false)
-    }
+    if (activeRun === run) endRun()
   }
 }
 
+// Whether Topp 10 is offered on this list page: not where nothing can be
+// rated (spirits, alcohol-free, gift items), which would only fetch pages to
+// say so.
+export function topListOffered(): boolean {
+  return !/^\/sortiment\/(alkoholfritt|presentartiklar|sprit|tobak)/.test(
+    location.pathname
+  )
+}
+
+// The page and its filters — not which page of results is shown ("&p=2"):
+// paging through the list keeps the selection Topp 10 was made for.
 function currentHref(): string {
-  return location.pathname + location.search
+  const params = new URLSearchParams(location.search)
+  params.delete('p')
+  params.delete('page')
+  const search = params.toString()
+  return location.pathname + (search ? `?${search}` : '')
+}
+
+// Ends the run in progress, if any, and frees the button at once: a run whose
+// last request hangs must not keep it disabled.
+function endRun() {
+  activeRun?.abort()
+  activeRun = null
+  domUtils.setTopListButtonBusy(false)
 }
 
 // The list the panel goes with: the one after the list controls.
@@ -176,17 +209,28 @@ function formatTime(timestamp: number): string {
 }
 
 function joinSources(sources: string[]): string {
-  return sources.length > 0 ? sources.join(` ${t('and')} `) : 'Vivino'
+  return sources.join(` ${t('and')} `)
 }
 
+// The saved list, parsed once per change: it is checked on every update of
+// the page while no panel is shown, and may hold a thousand products.
+let loaded: { parsed: null | SavedTopList; raw: null | string } = {
+  parsed: null,
+  raw: null
+}
 function loadTopList(): null | SavedTopList {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const saved = JSON.parse(raw) as Partial<SavedTopList>
-    return Array.isArray(saved.entries) && typeof saved.href === 'string'
-      ? (saved as SavedTopList)
-      : null
+    if (raw === loaded.raw) return loaded.parsed
+    const saved = raw ? (JSON.parse(raw) as Partial<SavedTopList>) : null
+    const parsed =
+      Array.isArray(saved?.entries) &&
+      typeof saved.href === 'string' &&
+      typeof saved.paused === 'object'
+        ? (saved as SavedTopList)
+        : null
+    loaded = { parsed, raw }
+    return parsed
   } catch {
     return null
   }
@@ -203,18 +247,13 @@ function openPanel(list: Element, hooks: TopListHooks): HTMLElement {
   const panel = domUtils.openTopListPanel(list, {
     onClose: () => {
       // Closed on purpose: it should not come back with the list either.
-      activeRun?.abort()
+      endRun()
       saveTopList(null)
       shown = null
     },
     onToggleHideTasted: hooks.toggleHideTasted
   })
   return panel
-}
-
-function placePanel(panel: HTMLElement, list: Element) {
-  const control = list.previousElementSibling
-  ;(control?.classList.contains('bp-sort') ? control : list).before(panel)
 }
 
 async function rankList(
@@ -250,6 +289,12 @@ async function rankList(
   let searchUrl
   try {
     searchUrl = await findListSearch(current.listCount, run.signal)
+    if (!searchUrl && live()) {
+      // A click right after a filter change can come before the browser has
+      // reported the site's new search; give it a moment.
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      searchUrl = await findListSearch(current.listCount, run.signal)
+    }
     if (!searchUrl) {
       fail(t('topListNoSearch'))
       return
@@ -314,48 +359,56 @@ async function rankList(
     return
   }
 
-  const rateable: TopListProduct[] = []
-  for (const product of found.products) {
-    // Same rules as a card: Vivino rates bottles only, and a product type
-    // switched off in the popup is left alone.
-    if (product.type === ProductType.Wine && !product.isBottle) continue
-    if (!(await hooks.featureEnabled(product.type))) continue
-    rateable.push(product)
+  // Same rules as a card: Vivino rates bottles only, and a product type
+  // switched off in the popup is left alone.
+  const enabled = new Map<ProductType, boolean>()
+  for (const type of new Set(found.products.map((product) => product.type))) {
+    enabled.set(type, await hooks.featureEnabled(type))
   }
+  if (!live()) return
+  const rateable = found.products.filter(
+    (product) =>
+      enabled.get(product.type) &&
+      !(product.type === ProductType.Wine && !product.isBottle)
+  )
   const sources = [
-    ...new Set(
-      rateable.map((product) =>
-        product.type === ProductType.Wine ? 'Vivino' : 'Untappd'
-      )
-    )
+    ...new Set(rateable.map((product) => sourceName(product.type)))
   ]
 
-  const scope = tf('topListScope', {
-    count: tn('products', current.listCount),
-    source: joinSources(sources)
-  })
+  const scope =
+    sources.length > 0
+      ? tf('topListScope', {
+          count: tn('products', current.listCount),
+          source: joinSources(sources)
+        })
+      : undefined
 
-  // Its own signal, so a paused rating site can stop the lookups without the
-  // run counting as closed.
-  const lookups = new AbortController()
+  // A signal per rating site, so a paused one stops its own lookups — not
+  // the other site's, and without the run counting as closed. (The run is
+  // live here, so the listener is not added to a signal already aborted.)
+  const lookups = new Map(
+    sources.map((source) => [source, new AbortController()])
+  )
   run.signal.addEventListener(
     'abort',
     () => {
-      lookups.abort()
+      for (const controller of lookups.values()) controller.abort()
     },
     { once: true }
   )
   let done = 0
   let failed = 0
-  let pausedUntil = 0
+  const paused: Partial<Record<string, number>> = {}
+  let renderedAt = 0
   const entries: TopListEntry[] = await Promise.all(
     rateable.map(async (product) => {
+      const source = sourceName(product.type)
       const rating = await enqueueListFetch(
         product.productId,
         product.name,
         product.type,
         lookupFacts(product),
-        { bulk: true, signal: lookups.signal }
+        { bulk: true, signal: lookups.get(source)?.signal }
       )
       done++
       if (rating.transient) {
@@ -364,11 +417,14 @@ async function rankList(
         // be turned away, and the attempt would prolong the ban.
         const until = sourcePausedUntil(product.type)
         if (until > 0) {
-          pausedUntil = Math.max(pausedUntil, until)
-          lookups.abort()
+          paused[source] = until
+          lookups.get(source)?.abort()
         }
       }
-      if (live()) {
+      // Cached ratings answer all at once; one render a frame is plenty.
+      const now = performance.now()
+      if (live() && (now - renderedAt > 100 || done === rateable.length)) {
+        renderedAt = now
         render(current, hooks, {
           progress: { done, total: rateable.length },
           running: true,
@@ -404,7 +460,7 @@ async function rankList(
     href: current.href,
     listCount: current.listCount,
     looked: rateable.length,
-    pausedUntil,
+    paused,
     savedAt: Date.now(),
     searchUrl,
     skipped: found.products.filter(
@@ -478,6 +534,9 @@ async function showSaved(current: Shown, hooks: TopListHooks) {
         null
     }))
   )
+  // The list may have changed, or another run started, while the marks were
+  // read; this list is not the one to show then.
+  if (shown !== current || current.changed) return
   const hideTasted = hooks.hideTasted()
   const ranked = rankTopList(entries, { hideTasted })
   const hidden = hideTasted ? tastedWinesOf(entries).size : 0
@@ -501,15 +560,19 @@ async function showSaved(current: Shown, hooks: TopListHooks) {
     .join(' ')
   // Nothing fetched at all is not "no ratings": the list is not there.
   const noneFetched = saved.failed > 0 && saved.failed >= saved.looked
+  // A pause long over (the list restored later) is not news any more.
+  const stillPaused = Object.entries(saved.paused).filter(
+    ([, until]) => until !== undefined && until > Date.now()
+  )
   const warning =
     saved.failed > 0
       ? [
-          saved.pausedUntil > 0
-            ? tf('topListPaused', {
-                source,
-                time: formatTime(saved.pausedUntil)
-              })
-            : null,
+          ...stillPaused.map(([pausedSource, until = 0]) =>
+            tf('topListPaused', {
+              source: pausedSource,
+              time: formatTime(until)
+            })
+          ),
           noneFetched
             ? t('topListNoneFetched')
             : tf('topListIncomplete', { count: tn('products', saved.failed) })
@@ -518,11 +581,14 @@ async function showSaved(current: Shown, hooks: TopListHooks) {
           .join(' ')
       : undefined
   const status =
-    ranked.length > 0 || noneFetched
-      ? undefined
-      : entries.length === 0
-        ? tf('topListEmpty', { source })
-        : t('topListAllTasted')
+    saved.looked === 0
+      ? t('topListNothingToRank')
+      : ranked.length > 0 || noneFetched
+        ? undefined
+        : entries.length === 0
+          ? tf('topListEmpty', { source })
+          : t('topListAllTasted')
+  const nothing = noneFetched || saved.looked === 0
 
   render(current, hooks, {
     actions: [
@@ -536,16 +602,17 @@ async function showSaved(current: Shown, hooks: TopListHooks) {
         }
       }
     ],
-    entries: noneFetched ? undefined : ranked,
-    footnote: noneFetched
-      ? tf('topListFootTime', { time: formatTime(saved.savedAt) })
-      : footnote,
+    entries: nothing ? undefined : ranked,
+    footnote: nothing ? undefined : footnote,
     running: false,
-    scope: tf('topListScope', {
-      count: tn('products', saved.listCount),
-      source
-    }),
+    scope: source
+      ? tf('topListScope', { count: tn('products', saved.listCount), source })
+      : undefined,
     status,
     warning
   })
+}
+
+function sourceName(type: ProductType): string {
+  return type === ProductType.Wine ? 'Vivino' : 'Untappd'
 }

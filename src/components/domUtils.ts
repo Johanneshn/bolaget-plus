@@ -500,13 +500,6 @@ const STYLES = `
     opacity: 0.6;
     cursor: progress;
   }
-  @media (max-width: 560px) {
-    .bp-top { margin: 0 0 16px; padding: 12px; }
-    .bp-top-header { flex-wrap: wrap; }
-    .bp-top li { grid-template-columns: 2ch 28px 1fr; }
-    .bp-top-rating { grid-column: 3; }
-    .bp-top-rating .bp-card-votes { min-width: 0; }
-  }
   .bp-top-name {
     color: ${FG};
     font-weight: 600;
@@ -531,13 +524,11 @@ const STYLES = `
     align-items: center;
     gap: 4px;
     white-space: nowrap;
-  }
-  .bp-top-rating svg { width: 14px; height: 14px; }
-  .bp-top-rating {
     color: ${FG};
     text-decoration: none;
     font-variant-numeric: tabular-nums;
   }
+  .bp-top-rating svg { width: 14px; height: 14px; }
   .bp-top-rating .bp-card-score {
     min-width: 3ch;
     font-weight: 700;
@@ -547,6 +538,13 @@ const STYLES = `
     min-width: 9ch;
     color: ${MUTED_FG};
     font-size: 12px;
+  }
+  @media (max-width: 560px) {
+    .bp-top { margin: 0 0 16px; padding: 12px; }
+    .bp-top-header { flex-wrap: wrap; }
+    .bp-top li { grid-template-columns: 2ch 28px 1fr; }
+    .bp-top-rating { grid-column: 3; }
+    .bp-top-rating .bp-card-votes { min-width: 0; }
   }
   .bp-card-spinner-inline {
     display: inline-block;
@@ -1259,6 +1257,7 @@ export function ensureListControls(
       top.type = 'button'
       top.className = 'bp-top-button'
       top.textContent = t('topList')
+      top.title = t('topListButtonTitle')
       top.addEventListener('click', () => {
         onTopList(listOf())
       })
@@ -1363,13 +1362,12 @@ export function replaceCardSpinner(
 export function setTopListButtonCount(list: Element, count: null | number) {
   const button = list.previousElementSibling?.querySelector('.bp-top-button')
   if (!button) return
-  button.setAttribute('title', t('topListButtonTitle'))
   const text =
     count === null
       ? t('topList')
       : `${t('topList')} ${t('of')} ${formatCount(count)}`
-  // Only on a change: the count is re-read on every DOM mutation, and this
-  // write is one too.
+  // Only on a change: the count is re-read whenever the page settles after
+  // a change, and this write is a change too.
   if (button.textContent !== text) button.textContent = text
 }
 
@@ -1460,8 +1458,8 @@ export interface TopListPanelState {
   // Lookups done of a total; a bar without a value when the total is unknown.
   progress?: 'unknown' | { done: number; total: number }
   running: boolean
-  // What is ranked, under the heading: "146 varor i ditt urval, efter betyg
-  // på Vivino".
+  // What is ranked, under the heading: "Bland 146 varor i ditt urval, efter
+  // betyg på Vivino".
   scope?: string
   // The one-line state of the run, or why there is nothing to show.
   status?: string
@@ -1504,12 +1502,13 @@ export function openTopListPanel(
   close.className = 'bp-top-close'
   close.textContent = t('close')
   close.addEventListener('click', () => {
-    // Focus would otherwise drop to the top of the page with the panel.
+    // Focus would otherwise drop to the top of the page with the panel. Closed
+    // first, so a cancelled run has freed the button by the time it is focused.
     const button =
       panel.nextElementSibling?.querySelector<HTMLElement>('.bp-top-button')
     panel.remove()
-    button?.focus()
     handlers.onClose()
+    button?.focus()
   })
   tools.append(hideTasted, close)
   header.append(titles, tools)
@@ -1522,11 +1521,15 @@ export function openTopListPanel(
   const body = document.createElement('div')
   body.className = 'bp-top-body'
   panel.append(header, announce, body)
-  // Before the controls when there are some, so the panel reads as their
-  // result rather than as part of the list.
+  placeTopListPanel(panel, list)
+  return panel
+}
+
+// Before the list's controls when there are some, so the panel reads as their
+// result rather than as part of the list.
+export function placeTopListPanel(panel: HTMLElement, list: Element): void {
   const control = list.previousElementSibling
   ;(control?.classList.contains('bp-sort') ? control : list).before(panel)
-  return panel
 }
 
 export function renderTopList(
@@ -1548,7 +1551,9 @@ export function renderTopList(
   const announce = panel.querySelector('.bp-top-announce')
   const phase = state.running
     ? t('topListRunning')
-    : (state.warning ?? (state.entries ? t('topListDone') : state.status))
+    : (state.warning ??
+      state.status ??
+      (state.entries ? t('topListDone') : undefined))
   if (announce && announce.textContent !== phase) {
     announce.textContent = phase ?? ''
   }

@@ -492,7 +492,11 @@ export async function fetchRatingFromVivino(
 // (which declares untappd.com) can fetch it.
 export async function fetchUntappdSearchConfig(): Promise<UntappdSearchConfig> {
   try {
-    const response = await fetch('https://untappd.com/search?type=beer')
+    // Awaited by every beer lookup on a cold start; a hang would stall the
+    // list queue as a hung search would.
+    const response = await fetch('https://untappd.com/search?type=beer', {
+      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS)
+    })
     if (!response.ok) {
       return UNTAPPD_FALLBACK_CONFIG
     }

@@ -165,8 +165,9 @@ async function drainLanes() {
 
 // A circuit breaker per rating site. Vivino and Untappd answer a burst of
 // queries with 429s, and a ban outlasts the burst: going on at the queue's
-// pace would only renew it, for the cards and product pages too, which share
-// the key and the IP. So after BREAKER_FAILURES transient failures in a row
+// pace would only renew it — for the cards too, which share the key and the
+// IP. (A product page's single lookup goes around the queue and the breaker:
+// the user asked for that one wine.) So after BREAKER_FAILURES transient failures in a row
 // the site is left alone for a while, doubling each time it is still failing,
 // and the first lookup after the pause decides whether it is over.
 const BREAKER_FAILURES = 5
@@ -181,6 +182,10 @@ interface Breaker {
   tripped: boolean
 }
 const breakers = new Map<'untappd' | 'vivino', Breaker>()
+// Kept for the tab, not just the page: product links are full page loads, and
+// each load would otherwise grant a banned site five fresh queries.
+const BREAKERS_KEY = 'bolaget-plus:breakers'
+let breakersLoaded = false
 
 export async function enqueueListFetch(
   productId: string,
@@ -231,8 +236,9 @@ export async function enqueueListFetch(
   return new Promise<RatingResponse>((resolve) => {
     const lookup: QueuedLookup = {
       run: async () => {
+        signal?.removeEventListener('abort', leaveQueue)
         if (lookup.skippable()) {
-          resolve(NOT_FETCHED)
+          resolve({ ...NOT_FETCHED })
           return
         }
         const rating = await fetchRating(
@@ -246,7 +252,7 @@ export async function enqueueListFetch(
         resolve(rating)
       },
       skip: () => {
-        resolve(NOT_FETCHED)
+        resolve({ ...NOT_FETCHED })
       },
       skippable: () => signal?.aborted === true || sourcePausedUntil(type) > 0
     }
@@ -254,16 +260,13 @@ export async function enqueueListFetch(
     lane.push(lookup)
     // A cancelled "Topp 10" run leaves the queue at once, so a later run or
     // card is not held up behind its leftovers.
-    signal?.addEventListener(
-      'abort',
-      () => {
-        const index = lane.indexOf(lookup)
-        if (index === -1) return
-        lane.splice(index, 1)
-        lookup.skip()
-      },
-      { once: true }
-    )
+    function leaveQueue() {
+      const index = lane.indexOf(lookup)
+      if (index === -1) return
+      lane.splice(index, 1)
+      lookup.skip()
+    }
+    signal?.addEventListener('abort', leaveQueue, { once: true })
     void drainLanes()
   })
 }
@@ -271,11 +274,31 @@ export async function enqueueListFetch(
 // When the site rating products of this type may be asked again, as a
 // timestamp; 0 when it is not paused.
 export function sourcePausedUntil(type: ProductType): number {
+  loadBreakers()
   const breaker = breakers.get(sourceOf(type))
   return breaker && breaker.pausedUntil > Date.now() ? breaker.pausedUntil : 0
 }
 
+function loadBreakers() {
+  if (breakersLoaded) return
+  breakersLoaded = true
+  try {
+    const raw = sessionStorage.getItem(BREAKERS_KEY)
+    if (!raw) return
+    for (const [source, breaker] of Object.entries(
+      JSON.parse(raw) as Record<string, Breaker>
+    )) {
+      if (source === 'untappd' || source === 'vivino') {
+        breakers.set(source, breaker)
+      }
+    }
+  } catch {
+    // Unreadable or blocked: start without a pause.
+  }
+}
+
 function recordLookup(type: ProductType, rating: RatingResponse) {
+  loadBreakers()
   const source = sourceOf(type)
   const breaker = breakers.get(source) ?? {
     failures: 0,
@@ -285,9 +308,12 @@ function recordLookup(type: ProductType, rating: RatingResponse) {
   }
   breakers.set(source, breaker)
   if (!rating.transient) {
+    // Nothing to record unless it was failing.
+    if (breaker.failures === 0 && !breaker.tripped) return
     breaker.failures = 0
     breaker.nextPause = BREAKER_FIRST_PAUSE_MS
     breaker.tripped = false
+    saveBreakers()
     return
   }
   breaker.failures++
@@ -296,6 +322,18 @@ function recordLookup(type: ProductType, rating: RatingResponse) {
     breaker.nextPause = Math.min(breaker.nextPause * 2, BREAKER_MAX_PAUSE_MS)
     breaker.failures = 0
     breaker.tripped = true
+  }
+  saveBreakers()
+}
+
+function saveBreakers() {
+  try {
+    sessionStorage.setItem(
+      BREAKERS_KEY,
+      JSON.stringify(Object.fromEntries(breakers))
+    )
+  } catch {
+    // Blocked: the pause holds for this page only.
   }
 }
 

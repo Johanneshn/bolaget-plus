@@ -53,3 +53,48 @@ describe('a rotated site API key', () => {
     expect(keysSent).toEqual([SHIPPED_KEY, ROTATED_KEY])
   })
 })
+
+describe('a search request', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  // On Firefox the page's fetch never sees the run's signal; a request that
+  // hangs must still let a cancelled run end, or the button stays disabled.
+  it('gives up as soon as the run is cancelled, even if the fetch hangs', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() => new Promise<Response>(() => undefined))
+    )
+    const run = new AbortController()
+    const fetching = fetchAllProducts(searchUrl, {
+      onProgress: vi.fn(),
+      signal: run.signal
+    })
+    run.abort()
+    await expect(fetching).rejects.toThrow()
+  })
+
+  // Firefox sends a content script's own fetch as the extension, which the
+  // API host is not declared for; the page's fetch goes out as the page.
+  it("goes through the page's own fetch where Firefox offers it", async () => {
+    const pageFetch = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ metadata: { docCount: 0 }, products: [] })
+        )
+      )
+    )
+    const ownFetch = vi.fn<typeof fetch>()
+    vi.stubGlobal('fetch', ownFetch)
+    vi.stubGlobal('cloneInto', <T>(value: T) => value)
+    Object.assign(window, { wrappedJSObject: { fetch: pageFetch } })
+    try {
+      await fetchAllProducts(searchUrl, { onProgress: vi.fn() })
+      expect(pageFetch).toHaveBeenCalledTimes(1)
+      expect(ownFetch).not.toHaveBeenCalled()
+    } finally {
+      Reflect.deleteProperty(window, 'wrappedJSObject')
+    }
+  })
+})

@@ -98,10 +98,6 @@ export function getCardProductType(card: Element): ProductType {
   return ProductType.Uncertain
 }
 
-// The producer Systembolaget names for a product, for the Vivino lookup to
-// confirm a winery with. Only the embedded page data carries it, so it is
-// missing after an SPA navigation to a product the loaded payload never held —
-// the lookup then falls back to judging the title alone, as it always has.
 // The result count the site prints above a list ("139 varor", "1 vara"), or
 // null when there is none on the page.
 export function getListCount(): null | number {
@@ -113,6 +109,10 @@ export function getListCount(): null | number {
   return null
 }
 
+// The producer Systembolaget names for a product, for the Vivino lookup to
+// confirm a winery with. Only the embedded page data carries it, so it is
+// missing after an SPA navigation to a product the loaded payload never held —
+// the lookup then falls back to judging the title alone, as it always has.
 export function getProducer(productId: string): null | string {
   return getProductFromPageData(productId)?.producer ?? null
 }

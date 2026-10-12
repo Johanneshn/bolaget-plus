@@ -13,7 +13,11 @@ import {
   unpinMatch
 } from '@/components/pinnedMatches'
 import * as productUtils from '@/components/productUtils'
-import { enqueueListFetch, fetchRating } from '@/components/ratingService'
+import {
+  enqueueListFetch,
+  fetchRating,
+  sourcePausedUntil
+} from '@/components/ratingService'
 import {
   beerFeatureEnabled,
   ciderFeatureEnabled,
@@ -26,7 +30,8 @@ import {
   checkTopList,
   refreshTopList,
   runTopList,
-  type TopListHooks
+  type TopListHooks,
+  topListOffered
 } from '@/components/topListRun'
 
 export default defineContentScript({
@@ -117,6 +122,17 @@ async function handleListCard(card: Element) {
     producer: productUtils.getProducer(productId) ?? undefined
   })
   domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
+  // Held back while its rating site is paused: try again once it is over,
+  // rather than leave the card bare for the rest of the visit.
+  const pausedUntil = rating.transient ? sourcePausedUntil(productType) : 0
+  if (pausedUntil > 0) {
+    setTimeout(
+      () => {
+        if (card.isConnected) void handleListCard(card)
+      },
+      pausedUntil - Date.now() + 1000
+    )
+  }
   // A beer can count as tasted through the Untappd history, which needs the
   // matched beer's link.
   await markCardTasted(card, productId, rating.link)
@@ -170,9 +186,11 @@ function addListControls(card: Element) {
       // "Dölj provade" applies to the Topp 10 shown too.
       refreshTopList(topListHooks)
     },
-    (current) => {
-      void runTopList(current, topListHooks)
-    }
+    topListOffered()
+      ? (current) => {
+          void runTopList(current, topListHooks)
+        }
+      : undefined
   )
   domUtils.applyListView(list, listView)
   // The view outlives the list it was chosen on: on the next page or a new

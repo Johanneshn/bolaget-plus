@@ -33,6 +33,8 @@ const SITE_API_KEY_PATTERN = /NEXT_PUBLIC_API_KEY_APIM:"([0-9a-f]{32})"/
 // unrated until the next run.
 export const WARN_ABOVE_PRODUCTS = 300
 export const MAX_PRODUCTS = 1000
+// How long one search request may take.
+const SEARCH_TIMEOUT_MS = 15_000
 // The API serves 30 products a page whatever size is asked for.
 const PAGE_SIZE = 30
 
@@ -246,7 +248,7 @@ export function watchSiteSearches(): void {
       }
     }).observe({ buffered: true, type: 'resource' })
   } catch {
-    // No resource timing: the button reports that it has nothing to rank.
+    // No resource timing: a run reports that it could not read the list.
   }
 }
 
@@ -284,15 +286,20 @@ async function fetchSearchPage(
   signal?.throwIfAborted()
   const url = new URL(searchUrl)
   url.searchParams.set('page', String(page))
-  let response = await siteFetch(url.toString(), siteApiKey, signal)
-  signal?.throwIfAborted()
+  let response = await withDeadline(
+    siteFetch(url.toString(), siteApiKey, signal),
+    signal
+  )
   // APIM answers a rotated key with 401.
   if (response.status === 401 && !siteApiKeyRead) {
     siteApiKeyRead = true
     const key = await readSiteApiKey()
     if (key && key !== siteApiKey) {
       siteApiKey = key
-      response = await siteFetch(url.toString(), siteApiKey, signal)
+      response = await withDeadline(
+        siteFetch(url.toString(), siteApiKey, signal),
+        signal
+      )
     }
   }
   if (!response.ok) {
@@ -408,6 +415,46 @@ function siteFetch(
 function thumbnailUrl(image: string): string {
   const source = encodeURIComponent(`${image}_100.webp`)
   return `https://www.systembolaget.se/_next/image/?url=${source}&w=64&q=75`
+}
+
+// A search request that gives up after SEARCH_TIMEOUT_MS, or as soon as the
+// run is cancelled. On Firefox the page's fetch is not given the run's signal
+// (see siteFetch), so a hung request would otherwise hold the run open.
+function withDeadline<T>(
+  request: Promise<T>,
+  signal?: AbortSignal
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const stop = (reason: string) => () => {
+      settle()
+      reject(new Error(reason))
+    }
+    const onAbort = stop('Search cancelled')
+    const timer = setTimeout(stop('Search timed out'), SEARCH_TIMEOUT_MS)
+    const settle = () => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+    }
+    if (signal?.aborted) {
+      onAbort()
+      return
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+    // Awaited into a promise of our own first: on Firefox the request is the
+    // page's promise, and the page cannot call the content script's functions
+    // handed to its then() — they would never run. await is not affected.
+    const own = (async () => await request)()
+    own.then(
+      (value) => {
+        settle()
+        resolve(value)
+      },
+      (error: unknown) => {
+        settle()
+        reject(error instanceof Error ? error : new Error(String(error)))
+      }
+    )
+  })
 }
 
 function withoutPage(url: string): string {
