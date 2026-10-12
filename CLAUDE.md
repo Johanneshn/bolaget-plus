@@ -108,6 +108,23 @@ external fetches are delegated to the background script.
 6. Back in `content.ts`, `handleRating` dispatches on `RatingResultStatus` and
    `domUtils.ts` renders the rating card (`#rating-container`) into the page.
 
+**Topp 10** ranks every product a list's filters match, not just the cards
+on screen. `topList.ts` replays a product search the site itself ran
+(`api-extern.systembolaget.se/.../productsearch/search`, recorded with a
+`PerformanceObserver`, picked by matching the page's "N varor") — that request
+carries the store choice, which the URL does not. It pages through the whole
+range, and ranks by rating (ties, at the printed precision, by votes; one entry
+per wine across bottle sizes). The API key is the site's public frontend key,
+re-read from the site's script bundle on a 401. On Firefox the search goes
+through the page's own fetch (`window.wrappedJSObject`) so the API host needs
+no host permission. `topListRun.ts` drives a run and every panel state, keeps
+the finished list in `sessionStorage` and restores it only for the same page,
+count and search. Lookups go through `enqueueListFetch` with `bulk: true`: a
+second lane behind the cards' (both paced at one per 300 ms), reusing any
+cached rating that was found. A per-site circuit breaker in `ratingService.ts`
+pauses Vivino or Untappd after five transient failures in a row (rate limit,
+network), for cards too, and a run stops and says so rather than renew a ban.
+
 **Popup** (`entrypoints/popup/`) is a plain HTML/TS toggle UI backed by the
 four `sync:`-scoped storage items in `settings.ts` (`featuresEnabled`,
 `wineFeatureEnabled`, `beerFeatureEnabled`, `ciderFeatureEnabled`, all default
