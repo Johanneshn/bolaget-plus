@@ -1332,10 +1332,13 @@ export function replaceCardSpinner(
 export function setTopListButtonCount(list: Element, count: null | number) {
   const button = list.previousElementSibling?.querySelector('.bp-top-button')
   if (!button) return
-  button.textContent =
+  const text =
     count === null
       ? t('topList')
       : `${t('topList')} ${t('of')} ${formatCount(count)}`
+  // Only on a change: the count is re-read on every DOM mutation, and this
+  // write is one too.
+  if (button.textContent !== text) button.textContent = text
 }
 
 // Stops at the total before a long run, for the user to narrow the list or

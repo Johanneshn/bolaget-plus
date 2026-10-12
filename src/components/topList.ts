@@ -16,11 +16,14 @@ import { buildSearchName, isBottlePackaging } from '@/components/productUtils'
 // Any API version: the site has moved from v1 to v2 before, and both answer
 // with the same products and metadata.
 const SEARCH_PATH = /^\/sb-api-ecommerce\/v\d+\/productsearch\/search$/
-// The key Systembolaget's own frontend sends with every search
-// (NEXT_PUBLIC_API_KEY_APIM in its bundle). Resource timing records the URL
-// of the site's request but not its headers, so the key cannot be read off
-// that; a rotation shows up as a failed fetch.
+// The key Systembolaget's own frontend sends with every search. Resource
+// timing records the URL of the site's request but not its headers, so the key
+// cannot be read off that; it is read out of the site's script bundle instead
+// (readSiteApiKey) when this one stops working.
 const SITE_API_KEY = '8d39a7340ee7439f8b4c1e995c8f3e4a'
+// How the bundle sets it: `NEXT_PUBLIC_API_KEY_APIM:"8d39…"` — Next.js inlines
+// the value but keeps the name, in a chunk every page loads.
+const SITE_API_KEY_PATTERN = /NEXT_PUBLIC_API_KEY_APIM:"([0-9a-f]{32})"/
 // How long a list may be. Each product is a Vivino or Untappd query, sent one
 // per 300 ms: past WARN_ABOVE_PRODUCTS (a minute and a half on a first run)
 // the user is asked before the run goes on, and past MAX_PRODUCTS (five
@@ -224,21 +227,42 @@ function distanceFromBottle({ product }: TopListEntry): number {
   return Math.abs(product.volumeMl - 750)
 }
 
+// The key in use: the shipped one until the API turns it away, then whatever
+// the site's bundle holds — read once per page load, as a key that fails
+// again is not one a second read would fix.
+let siteApiKey = SITE_API_KEY
+let siteApiKeyRead = false
+
+// What Firefox adds to a content script's globals.
+interface FirefoxContentScope {
+  cloneInto?: <T>(value: T, target: object) => T
+  content?: { fetch?: typeof fetch }
+}
+
 async function fetchSearchPage(
   searchUrl: string,
   page: number,
   signal?: AbortSignal
 ): Promise<SearchPage> {
+  signal?.throwIfAborted()
   const url = new URL(searchUrl)
   url.searchParams.set('page', String(page))
-  const response = await fetch(url, {
-    headers: { 'Ocp-Apim-Subscription-Key': SITE_API_KEY },
-    signal
-  })
+  let response = await siteFetch(url.toString(), siteApiKey, signal)
+  // APIM answers a rotated key with 401.
+  if (response.status === 401 && !siteApiKeyRead) {
+    siteApiKeyRead = true
+    const key = await readSiteApiKey()
+    if (key && key !== siteApiKey) {
+      siteApiKey = key
+      response = await siteFetch(url.toString(), siteApiKey, signal)
+    }
+  }
   if (!response.ok) {
     throw new Error(`Search failed: ${String(response.status)}`)
   }
-  return (await response.json()) as SearchPage
+  // Parsed here rather than with response.json(): on Firefox the response
+  // belongs to the page, and so would the objects json() made.
+  return JSON.parse(await response.text()) as SearchPage
 }
 
 function isListSearch(url: string): boolean {
@@ -286,10 +310,53 @@ function productUrl(type: ProductType, name: string, id: string): string {
   return `https://www.systembolaget.se/produkt/${section}/${slug}-${id}/`
 }
 
+// The key the site's own frontend uses, out of the scripts the page loaded
+// (the browser has them cached). Null when no script holds one.
+async function readSiteApiKey(): Promise<null | string> {
+  const sources = [
+    ...document.querySelectorAll<HTMLScriptElement>(
+      'script[src*="/_next/static/"]'
+    )
+  ].map((script) => script.src)
+  const keys = await Promise.all(
+    sources.map(async (source) => {
+      try {
+        const response = await fetch(source)
+        if (!response.ok) return null
+        return SITE_API_KEY_PATTERN.exec(await response.text())?.[1] ?? null
+      } catch {
+        return null
+      }
+    })
+  )
+  return keys.find((key) => key !== null) ?? null
+}
+
 function readString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const trimmed = value.trim()
   return trimmed ? trimmed : undefined
+}
+
+// A request to the search API, sent as the page would send it. Chrome does
+// that for a content script's own fetch, and the API's CORS lets the site's
+// origin in. Firefox instead sends it as the extension, which reaches only
+// the hosts in host_permissions — and adding the API's host there would ask
+// every existing user for a new permission. Its content scripts get the
+// page's own fetch as content.fetch for exactly this. The signal stays out of
+// that call (an AbortSignal from the content script is not one to the page);
+// fetchSearchPage checks it before every request instead.
+function siteFetch(
+  url: string,
+  key: string,
+  signal?: AbortSignal
+): Promise<Response> {
+  const headers = { 'Ocp-Apim-Subscription-Key': key }
+  const { cloneInto, content } = globalThis as FirefoxContentScope
+  if (content?.fetch && cloneInto) {
+    return content.fetch(url, cloneInto({ headers }, content))
+  }
+  return fetch(url, { headers, signal })
 }
 
 function withoutPage(url: string): string {

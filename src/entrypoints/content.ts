@@ -57,6 +57,7 @@ export default defineContentScript({
       listCardObserver.observe(card)
       addListControls(card)
     })
+    watchListCount()
   },
   matches: ['*://*.systembolaget.se/*']
 })
@@ -183,6 +184,34 @@ function addListControls(card: Element) {
   }
   domUtils.setTopListButtonCount(list, productUtils.getListCount())
   if (isNewList) restoreTopList(list)
+}
+
+// Keeps "Topp 10 av N" in step with the "N varor" the page shows. Cards
+// arriving update it too, but a filter change that keeps the same cards on
+// screen (a price range that excludes nothing among the first 30) changes
+// only the count.
+function watchListCount() {
+  let pending = false
+  new MutationObserver(() => {
+    if (pending) return
+    pending = true
+    // A filter change re-renders in bursts; one read after it settles is
+    // enough, and the read walks the whole of <main>.
+    setTimeout(() => {
+      pending = false
+      const controls = document.querySelectorAll('.bp-sort')
+      if (controls.length === 0) return
+      const count = productUtils.getListCount()
+      for (const control of controls) {
+        const list = control.nextElementSibling
+        if (list) domUtils.setTopListButtonCount(list, count)
+      }
+    }, 250)
+  }).observe(document.body, {
+    characterData: true,
+    childList: true,
+    subtree: true
+  })
 }
 
 // The "Topp 10" run in progress, cancelled when the panel is closed or a new
