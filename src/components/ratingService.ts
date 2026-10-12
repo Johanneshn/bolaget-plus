@@ -252,6 +252,12 @@ export async function enqueueListFetch(
           resolve({ ...NOT_FETCHED })
           return
         }
+        // Filled during the wait: still not an answer from the site.
+        const late = await fromCache()
+        if (late) {
+          resolve(late)
+          return
+        }
         const rating = await fetchRating(
           productId,
           productName,

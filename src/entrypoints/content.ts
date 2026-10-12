@@ -130,21 +130,20 @@ async function handleListCard(card: Element) {
   // once the pause is over, or in a minute — rather than leave the card bare
   // for the rest of the visit. A site that keeps failing is paused by the
   // breaker, which bounds what these retries can send.
-  if (rating.transient) {
-    const pausedUntil = sourcePausedUntil(productType)
-    setTimeout(
-      () => {
-        if (card.isConnected) void handleListCard(card)
-      },
-      pausedUntil > 0 ? pausedUntil - Date.now() + 1000 : 60_000
-    )
-  }
+  if (rating.transient) scheduleCardRetry(card, productType)
   // A beer can count as tasted through the Untappd history, which needs the
   // matched beer's link.
   await markCardTasted(card, productId, rating.link)
   const list = card.closest('ul')
   if (list) domUtils.applyListView(list, listView)
 }
+
+// One pending retry per card: each re-sort or "Dölj provade" looks the card
+// up again, and every failed lookup scheduling its own retry would multiply
+// them. A failure that is not a pause (one product's lookup erring while the
+// site answers others) is retried a few times only.
+const cardRetries = new WeakMap<Element, number>()
+const MAX_CARD_RETRIES = 3
 
 async function markCardTasted(
   card: Element,
@@ -157,6 +156,22 @@ async function markCardTasted(
   domUtils.markCardTasted(card, source !== null)
   const list = card.closest('ul')
   if (list && listView.hideTasted) domUtils.applyListView(list, listView)
+}
+
+function scheduleCardRetry(card: Element, productType: ProductType) {
+  const retries = cardRetries.get(card) ?? 0
+  if (retries < 0) return
+  const pausedUntil = sourcePausedUntil(productType)
+  if (pausedUntil === 0 && retries >= MAX_CARD_RETRIES) return
+  // Negative while a retry is pending.
+  cardRetries.set(card, -(retries + 1))
+  setTimeout(
+    () => {
+      cardRetries.set(card, retries + 1)
+      if (card.isConnected) void handleListCard(card)
+    },
+    pausedUntil > 0 ? pausedUntil - Date.now() + 1000 : 60_000
+  )
 }
 
 // The "Provad" toggle on a product page. Re-rendered after the rating

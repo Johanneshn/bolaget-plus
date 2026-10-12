@@ -82,6 +82,8 @@ const SECONDS_PER_LOOKUP = 0.45
 const STORAGE_KEY = 'bolaget-plus:top-list:v2'
 
 let shown: null | Shown = null
+// Re-renders the list when a pause it reports is over.
+let pauseTimer: ReturnType<typeof setTimeout> | undefined
 let activeRun: AbortController | null = null
 
 // Brings a saved list back, follows the list on screen when it changes, and
@@ -650,9 +652,10 @@ async function showSaved(current: Shown, hooks: TopListHooks) {
           : t('topListAllTasted')
   // Asking again during a pause would only be turned away.
   const pausedTill = Math.max(0, ...stillPaused.map(([, until = 0]) => until))
+  clearTimeout(pauseTimer)
   if (pausedTill > 0) {
     // Offered again, and the pause notice dropped, once the pause is over.
-    setTimeout(
+    pauseTimer = setTimeout(
       () => {
         refreshTopList(hooks)
       },

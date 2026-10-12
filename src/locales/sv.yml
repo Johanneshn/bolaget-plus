@@ -42,7 +42,7 @@ topListLoading: Hämtar varorna i urvalet – {done} av {total}
 topListNoSearch: Kunde inte läsa av urvalet. Ladda om sidan och försök igen.
 topListNoneFetched: Inga betyg kunde hämtas.
 topListNothingToRank: Inga varor i urvalet går att rangordna – Topp 10 gäller vin på flaska, öl och cider.
-topListPaused: Just nu svarar {source} inte – troligen för att Bolaget+ har sökt för mycket på kort tid. Nya sökningar dit väntar till kl. {time}.
+topListPaused: Just nu svarar {source} inte – troligen för att Bolaget+ har sökt för mycket på kort tid. Bolaget+ söker där igen kl. {time}.
 topListRating: Hämtar betyg – {done} av {total}
 topListRatingFailed: Hämtar betyg – {done} av {total} ({failed} misslyckades)
 topListReading: Läser av urvalet …
@@ -50,7 +50,7 @@ topListRefresh: Uppdatera
 topListRetry: Försök igen
 topListRetryAt: Försök igen kl. {time}
 topListRunAnyway: Fortsätt ändå
-topListRunNew: Ta fram för det nya urvalet
+topListRunNew: Ta fram Topp 10 för det nya urvalet
 topListRunning: Hämtar betyg för Topp 10
 topListScope: Bland {count} i ditt urval, efter betyg på {source}
 topListSwitchedOff: Betygen för varorna i urvalet är avstängda i Bolaget+.

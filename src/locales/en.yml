@@ -42,7 +42,7 @@ topListLoading: Fetching the products in the selection – {done} of {total}
 topListNoSearch: Could not read the selection. Reload the page and try again.
 topListNoneFetched: No ratings could be fetched.
 topListNothingToRank: Nothing in the selection can be ranked – Top 10 covers bottled wine, beer and cider.
-topListPaused: Right now {source} is not answering – probably because Bolaget+ searched too much in a short time. New searches there wait until {time}.
+topListPaused: Right now {source} is not answering – probably because Bolaget+ searched too much in a short time. Bolaget+ searches there again at {time}.
 topListRating: Fetching ratings – {done} of {total}
 topListRatingFailed: Fetching ratings – {done} of {total} ({failed} failed)
 topListReading: Reading the selection …
@@ -50,7 +50,7 @@ topListRefresh: Refresh
 topListRetry: Try again
 topListRetryAt: Try again at {time}
 topListRunAnyway: Continue anyway
-topListRunNew: Make one for the new selection
+topListRunNew: Make a Top 10 for the new selection
 topListRunning: Fetching ratings for Top 10
 topListScope: Among {count} in your selection, by rating on {source}
 topListSwitchedOff: Ratings for the products in the selection are switched off in Bolaget+.
