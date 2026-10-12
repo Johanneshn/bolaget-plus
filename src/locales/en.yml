@@ -1,4 +1,5 @@
 allVintages: all vintages
+and: and
 brewery: Brewery
 cancel: Cancel
 checkedInOnUntappd: Checked in on Untappd
@@ -14,6 +15,7 @@ noMatch: Sorry, we could not find any rating for this product.
 noRatingYet: Not enough ratings yet
 notOnBottle: The Wine isn't bottled.
 of: of
+products: 1 product | {count} products
 rating: Rating
 searchAtUntappd: Search at Untappd
 searchAtVivino: Search at Vivino
@@ -23,17 +25,33 @@ sortRating: Rating
 sortValue: Value
 tasted: Tasted
 topList: Top 10
-topListEmpty: Found no ratings for these products.
-topListFailed: Could not fetch the range.
-topListFetching: Fetching the range
-topListFootRated: products had a rating to rank on.
-topListFootSkipped: boxes and bags are left out – Vivino only rates bottles.
-topListFootTasted: tasted ones are hidden.
-topListNoSearch: Found no search to rank. Change a filter and try again.
-topListRating: Fetching ratings
+topListAllTasted: You have tasted every rated product in the selection. Turn off “Hide tasted” to see them.
+topListButtonTitle: Ranks every product matching the filters by rating – not only the ones on the page
+topListChanged: The selection has changed since this list was made.
+topListConfirm: The selection has {count}. Fetching ratings for all of them takes about {minutes} min. Pick a store or more filters for a shorter list – or run anyway.
+topListDone: Top 10 is ready
+topListEmpty: None of the products in the selection has a rating on {source}.
+topListFailed: Could not fetch the products in the selection.
+topListFootRated: Ratings found for {rated} of {total}.
+topListFootSkipped: Products in box, can or other packaging than a bottle ({count}) are left out – Vivino only rates bottles.
+topListFootTasted: 1 tasted product is hidden. | {count} tasted products are hidden.
+topListFootTime: Fetched {time}.
+topListFootUncertain: No certain match for {count}.
+topListIncomplete: Ratings could not be fetched for {count}, so the list may be missing products.
+topListLoading: Fetching the products in the selection – {done} of {total}
+topListNoSearch: Could not read the selection. Reload the page and try again.
+topListNoneFetched: No ratings could be fetched.
+topListPaused: Searches on {source} are paused until {time} – it is not answering right now, probably because we searched too much in a short time.
+topListRating: Fetching ratings – {done} of {total}
+topListRatingFailed: Fetching ratings – {done} of {total} ({failed} failed)
+topListReading: Reading the selection …
+topListRefresh: Run again
+topListRetry: Try again
 topListRunAnyway: Run anyway
-topListSlow: products. Fetching ratings for all of them can take several minutes – pick a store or more filters to shorten the list, or run anyway.
-topListTooMany: products are too many to rank. Pick a store or more filters to bring the list down to at most
+topListRunNew: Run for the new selection
+topListRunning: Fetching ratings for Top 10
+topListScope: Among {count} in your selection, by rating on {source}
+topListTooMany: The selection has {count} – too many to rank. Pick a store or more filters to bring it down to at most {max} products.
 uncertainMatch: Could not find an exact match, you can search yourself via the link below.
 undo: Undo
 vintage: Vintage

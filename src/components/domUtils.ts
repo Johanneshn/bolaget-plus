@@ -367,10 +367,60 @@ const STYLES = `
   }
   .bp-top-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 8px;
+  }
+  .bp-top-header h2:focus { outline: none; }
+  .bp-top-scope {
+    margin: 2px 0 0;
+    color: ${MUTED_FG};
+    font-size: 13px;
+  }
+  .bp-top-scope:empty { display: none; }
+  .bp-top-tools {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
+  }
+  .bp-top-header .bp-top-hide-tasted {
+    border: 1px solid var(--border-strong, #26262640);
+    border-radius: 999px;
+    color: ${FG};
+  }
+  .bp-top-header .bp-top-hide-tasted[aria-pressed='true'] {
+    border-color: ${PRIMARY};
+    background: ${PRIMARY};
+    color: var(--primary-foreground, #ffffff);
+  }
+  .bp-top [hidden] { display: none; }
+  .bp-top-announce {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .bp-top-warning {
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    border-left: 3px solid #c2410c;
+    border-radius: 4px;
+    background: var(--background, #ffffff);
+    color: ${FG};
+  }
+  .bp-top-footnote {
+    margin: 8px 0 0;
+    color: ${MUTED_FG};
+    font-size: 13px;
+  }
+  .bp-top-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
   .bp-top-header h2 {
     margin: 0;
@@ -382,6 +432,7 @@ const STYLES = `
     color: ${PRIMARY};
   }
   .bp-top-header button {
+    min-height: 32px;
     padding: 4px 10px;
     border: 0;
     background: transparent;
@@ -429,7 +480,7 @@ const STYLES = `
   }
   .bp-top li {
     display: grid;
-    grid-template-columns: 2ch 1fr auto;
+    grid-template-columns: 2ch 28px 1fr auto;
     align-items: center;
     gap: 4px 12px;
     padding: 8px 0;
@@ -439,6 +490,22 @@ const STYLES = `
   .bp-top-rank {
     color: ${MUTED_FG};
     font-variant-numeric: tabular-nums;
+  }
+  .bp-top-image {
+    width: 28px;
+    height: 52px;
+    object-fit: contain;
+  }
+  .bp-sort .bp-top-button:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+  @media (max-width: 560px) {
+    .bp-top { margin: 0 0 16px; padding: 12px; }
+    .bp-top-header { flex-wrap: wrap; }
+    .bp-top li { grid-template-columns: 2ch 28px 1fr; }
+    .bp-top-rating { grid-column: 3; }
+    .bp-top-rating .bp-card-votes { min-width: 0; }
   }
   .bp-top-name {
     color: ${FG};
@@ -1257,42 +1324,6 @@ export function markCardTasted(card: Element, tasted: boolean): void {
   after?.insertAdjacentElement('afterend', mark)
 }
 
-// The "Topp 10" panel, between the list controls and the list. One per page:
-// opening it again starts over in the same panel.
-export function openTopListPanel(
-  list: Element,
-  onClose: () => void
-): HTMLElement {
-  ensureStyles()
-  document.querySelector('.bp-top')?.remove()
-  const panel = document.createElement('section')
-  panel.className = 'bp-top'
-  panel.setAttribute('aria-live', 'polite')
-
-  const header = document.createElement('div')
-  header.className = 'bp-top-header'
-  const heading = document.createElement('h2')
-  heading.textContent = `Bolaget+ · ${t('topList')}`
-  const close = document.createElement('button')
-  close.type = 'button'
-  close.className = 'bp-top-close'
-  close.textContent = t('close')
-  close.addEventListener('click', () => {
-    panel.remove()
-    onClose()
-  })
-  header.append(heading, close)
-
-  const body = document.createElement('div')
-  body.className = 'bp-top-body'
-  panel.append(header, body)
-  // Before the controls when there are some, so the panel reads as their
-  // result rather than as part of the list.
-  const control = list.previousElementSibling
-  ;(control?.classList.contains('bp-sort') ? control : list).before(panel)
-  return panel
-}
-
 export function replaceCardSpinner(
   card: Element,
   spinner: HTMLElement,
@@ -1332,6 +1363,7 @@ export function replaceCardSpinner(
 export function setTopListButtonCount(list: Element, count: null | number) {
   const button = list.previousElementSibling?.querySelector('.bp-top-button')
   if (!button) return
+  button.setAttribute('title', t('topListButtonTitle'))
   const text =
     count === null
       ? t('topList')
@@ -1339,112 +1371,6 @@ export function setTopListButtonCount(list: Element, count: null | number) {
   // Only on a change: the count is re-read on every DOM mutation, and this
   // write is one too.
   if (button.textContent !== text) button.textContent = text
-}
-
-// Stops at the total before a long run, for the user to narrow the list or
-// go ahead anyway.
-export function setTopListConfirm(
-  panel: HTMLElement,
-  text: string,
-  onConfirm: () => void
-): void {
-  const run = document.createElement('button')
-  run.type = 'button'
-  run.className = 'bp-top-run'
-  run.textContent = t('topListRunAnyway')
-  run.addEventListener('click', onConfirm)
-  setTopListBody(panel, [createTopListText(text), run], false)
-}
-
-// A run in progress: what it is doing and how far it has come. Without a total
-// the bar shows activity only.
-export function setTopListProgress(
-  panel: HTMLElement,
-  text: string,
-  done = 0,
-  total = 0
-): void {
-  const bar = document.createElement('progress')
-  if (total > 0) {
-    bar.max = total
-    bar.value = done
-  }
-  bar.setAttribute('aria-label', text)
-  setTopListBody(panel, [createTopListText(text), bar], true)
-}
-
-export function setTopListResults(
-  panel: HTMLElement,
-  entries: TopListEntry[],
-  footnote: string
-): void {
-  const body = panel.querySelector('.bp-top-body')
-  if (!body) return
-  if (entries.length === 0) {
-    setTopListStatus(panel, t('topListEmpty'))
-    return
-  }
-
-  const list = document.createElement('ol')
-  entries.forEach((entry, index) => {
-    const { product, rating } = entry
-    const item = document.createElement('li')
-    const rank = document.createElement('span')
-    rank.className = 'bp-top-rank'
-    rank.textContent = String(index + 1)
-
-    const text = document.createElement('div')
-    const name = document.createElement('a')
-    name.className = 'bp-top-name'
-    name.href = product.url
-    name.textContent = product.title
-    const details = document.createElement('div')
-    details.className = 'bp-top-details'
-    details.textContent = [
-      product.price > 0 ? `${formatPrice(product.price)}:-` : null,
-      product.volumeMl > 0 ? `${formatCount(product.volumeMl)} ml` : null,
-      // The name it was matched to, so a wrong match is visible at a glance.
-      rating.name
-        ? `${product.type === ProductType.Wine ? 'Vivino' : 'Untappd'}: ${rating.name}`
-        : null
-    ]
-      .filter(Boolean)
-      .join(' · ')
-    text.append(name, details)
-    if (entry.tasted) {
-      const tasted = document.createElement('span')
-      tasted.className = 'bp-top-tasted'
-      tasted.append(createCheckIcon(), t('tasted'))
-      text.append(tasted)
-    }
-
-    const score = document.createElement(rating.link ? 'a' : 'span')
-    score.className = 'bp-top-rating'
-    if (score instanceof HTMLAnchorElement && rating.link) {
-      score.href = rating.link
-      score.target = '_blank'
-      score.rel = 'noopener noreferrer'
-    }
-    score.setAttribute('aria-label', ratingLabel(rating))
-    const votes = document.createElement('span')
-    votes.className = 'bp-card-votes'
-    votes.textContent = `(${formatCount(rating.votes)})`
-    score.append(
-      createRatingIcons(product.type, rating.rating),
-      createScore(rating.rating, 'bp-card-score'),
-      votes
-    )
-
-    item.append(rank, text, score)
-    list.append(item)
-  })
-
-  setTopListBody(panel, [list, createTopListText(footnote)], false)
-}
-
-// A one-line end state of the panel: why there is nothing to show.
-export function setTopListStatus(panel: HTMLElement, text: string): void {
-  setTopListBody(panel, [createTopListText(text)], false)
 }
 
 // How much better each card is rated than is usual for its price, in rating
@@ -1510,18 +1436,6 @@ function setStyle(
   }
 }
 
-// Fills the panel. While a run is going its close button cancels the run, and
-// says so.
-function setTopListBody(
-  panel: HTMLElement,
-  content: Node[],
-  running: boolean
-): void {
-  panel.querySelector('.bp-top-body')?.replaceChildren(...content)
-  const close = panel.querySelector('.bp-top-close')
-  if (close) close.textContent = t(running ? 'cancel' : 'close')
-}
-
 // Scores and counts the way the Swedish page around them writes numbers:
 // "3,9" and "98 172", not "3.9" and "98172".
 const scoreFormat = new Intl.NumberFormat('sv-SE', {
@@ -1529,11 +1443,181 @@ const scoreFormat = new Intl.NumberFormat('sv-SE', {
   minimumFractionDigits: 1
 })
 const countFormat = new Intl.NumberFormat('sv-SE')
-const priceFormat = new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 2 })
 
 // Shown where the source has too few ratings for a score; the reason is in
 // the title and the screen-reader label.
 const NO_SCORE = '–'
+
+// What the "Topp 10" panel shows. Rendered whole from this on every change,
+// so each state of a run — and of a list brought back later — reads the same.
+export interface TopListPanelState {
+  // Buttons under the text: run anyway, retry, run again.
+  actions?: { label: string; onClick: () => void }[]
+  entries?: TopListEntry[]
+  // Small print under the list: what was counted and what was left out.
+  footnote?: string
+  hideTasted: boolean
+  // Lookups done of a total; a bar without a value when the total is unknown.
+  progress?: 'unknown' | { done: number; total: number }
+  running: boolean
+  // What is ranked, under the heading: "146 varor i ditt urval, efter betyg
+  // på Vivino".
+  scope?: string
+  // The one-line state of the run, or why there is nothing to show.
+  status?: string
+  // Something the list cannot be trusted for, above it.
+  warning?: string
+}
+
+// The "Topp 10" panel, between the list controls and the list. One per page:
+// opening it again starts over in the same place.
+export function openTopListPanel(
+  list: Element,
+  handlers: { onClose: () => void; onToggleHideTasted: () => void }
+): HTMLElement {
+  ensureStyles()
+  document.querySelector('.bp-top')?.remove()
+  const panel = document.createElement('section')
+  panel.className = 'bp-top'
+  panel.setAttribute('aria-labelledby', 'bp-top-heading')
+
+  const header = document.createElement('div')
+  header.className = 'bp-top-header'
+  const titles = document.createElement('div')
+  const heading = document.createElement('h2')
+  heading.id = 'bp-top-heading'
+  heading.tabIndex = -1
+  heading.textContent = `Bolaget+ · ${t('topList')}`
+  const scope = document.createElement('p')
+  scope.className = 'bp-top-scope'
+  titles.append(heading, scope)
+
+  const tools = document.createElement('div')
+  tools.className = 'bp-top-tools'
+  const hideTasted = document.createElement('button')
+  hideTasted.type = 'button'
+  hideTasted.className = 'bp-top-hide-tasted'
+  hideTasted.textContent = t('hideTasted')
+  hideTasted.addEventListener('click', handlers.onToggleHideTasted)
+  const close = document.createElement('button')
+  close.type = 'button'
+  close.className = 'bp-top-close'
+  close.textContent = t('close')
+  close.addEventListener('click', () => {
+    // Focus would otherwise drop to the top of the page with the panel.
+    const button =
+      panel.nextElementSibling?.querySelector<HTMLElement>('.bp-top-button')
+    panel.remove()
+    button?.focus()
+    handlers.onClose()
+  })
+  tools.append(hideTasted, close)
+  header.append(titles, tools)
+
+  // Screen readers hear the state changes (running, done, paused), not every
+  // lookup the progress line counts.
+  const announce = document.createElement('p')
+  announce.className = 'bp-top-announce'
+  announce.setAttribute('role', 'status')
+  const body = document.createElement('div')
+  body.className = 'bp-top-body'
+  panel.append(header, announce, body)
+  // Before the controls when there are some, so the panel reads as their
+  // result rather than as part of the list.
+  const control = list.previousElementSibling
+  ;(control?.classList.contains('bp-sort') ? control : list).before(panel)
+  return panel
+}
+
+export function renderTopList(
+  panel: HTMLElement,
+  state: TopListPanelState
+): void {
+  const body = panel.querySelector('.bp-top-body')
+  if (!body) return
+  const scope = panel.querySelector('.bp-top-scope')
+  if (scope) scope.textContent = state.scope ?? ''
+  const close = panel.querySelector('.bp-top-close')
+  if (close) close.textContent = t(state.running ? 'cancel' : 'close')
+  const hideTasted = panel.querySelector('.bp-top-hide-tasted')
+  hideTasted?.setAttribute('aria-pressed', String(state.hideTasted))
+  // Only worth offering once there is a list to hide them from.
+  hideTasted?.toggleAttribute('hidden', !state.entries)
+  panel.setAttribute('aria-busy', String(state.running))
+
+  const announce = panel.querySelector('.bp-top-announce')
+  const phase = state.running
+    ? t('topListRunning')
+    : (state.warning ?? (state.entries ? t('topListDone') : state.status))
+  if (announce && announce.textContent !== phase) {
+    announce.textContent = phase ?? ''
+  }
+
+  const content: Node[] = []
+  if (state.warning) {
+    const warning = document.createElement('p')
+    warning.className = 'bp-top-warning'
+    warning.textContent = state.warning
+    content.push(warning)
+  }
+  if (state.status) {
+    const status = document.createElement('p')
+    status.className = 'bp-top-status'
+    status.textContent = state.status
+    content.push(status)
+  }
+  if (state.progress) {
+    // Kept across renders: a new element each lookup restarts its animation
+    // and makes screen readers announce it again.
+    const bar =
+      body.querySelector('progress') ?? document.createElement('progress')
+    if (state.progress === 'unknown') {
+      bar.removeAttribute('value')
+    } else {
+      bar.max = Math.max(state.progress.total, 1)
+      bar.value = state.progress.done
+    }
+    bar.setAttribute('aria-label', t('topListRunning'))
+    content.push(bar)
+  }
+  if (state.entries) content.push(createTopListEntries(state.entries))
+  if (state.footnote) {
+    const footnote = document.createElement('p')
+    footnote.className = 'bp-top-footnote'
+    footnote.textContent = state.footnote
+    content.push(footnote)
+  }
+  if (state.actions?.length) {
+    const actions = document.createElement('div')
+    actions.className = 'bp-top-actions'
+    for (const action of state.actions) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'bp-top-run'
+      button.textContent = action.label
+      button.addEventListener('click', action.onClick)
+      actions.append(button)
+    }
+    content.push(actions)
+  }
+  const focused = panel.contains(document.activeElement)
+  body.replaceChildren(...content)
+  // A button that was clicked is gone now; keep focus in the panel.
+  if (focused && !panel.contains(document.activeElement)) {
+    panel.querySelector<HTMLElement>('#bp-top-heading')?.focus()
+  }
+}
+
+// Marks the Topp 10 button as busy while a run is going: clicking it again
+// would only start the same run over.
+export function setTopListButtonBusy(busy: boolean): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    '.bp-top-button'
+  )) {
+    button.disabled = busy
+    button.setAttribute('aria-busy', String(busy))
+  }
+}
 
 // The score as text. A score of 0 means the source has too few ratings to
 // compute one yet — Vivino withholds the average below about 25 ratings — not
@@ -1550,11 +1634,70 @@ function createScore(score: number, className: string): HTMLElement {
   return element
 }
 
-function createTopListText(text: string): HTMLElement {
-  const status = document.createElement('p')
-  status.className = 'bp-top-status'
-  status.textContent = text
-  return status
+function createTopListEntries(entries: TopListEntry[]): HTMLElement {
+  const list = document.createElement('ol')
+  entries.forEach((entry, index) => {
+    const { product, rating } = entry
+    const item = document.createElement('li')
+    const rank = document.createElement('span')
+    rank.className = 'bp-top-rank'
+    rank.textContent = String(index + 1)
+
+    const image = document.createElement('img')
+    image.className = 'bp-top-image'
+    image.alt = ''
+    image.loading = 'lazy'
+    image.decoding = 'async'
+    if (product.imageUrl) image.src = product.imageUrl
+    else image.style.visibility = 'hidden'
+
+    const text = document.createElement('div')
+    text.className = 'bp-top-text'
+    const name = document.createElement('a')
+    name.className = 'bp-top-name'
+    name.href = product.url
+    name.textContent = product.title
+    const details = document.createElement('div')
+    details.className = 'bp-top-details'
+    details.textContent = [
+      product.price > 0 ? formatPrice(product.price) : null,
+      product.volumeMl > 0 ? `${formatCount(product.volumeMl)} ml` : null,
+      // The name it was matched to, so a wrong match is visible at a glance.
+      rating.name
+        ? `${product.type === ProductType.Wine ? 'Vivino' : 'Untappd'}: ${rating.name}`
+        : null
+    ]
+      .filter(Boolean)
+      .join(' · ')
+    text.append(name, details)
+    if (entry.tasted) {
+      const tasted = document.createElement('span')
+      tasted.className = 'bp-top-tasted'
+      tasted.append(createCheckIcon(), t('tasted'))
+      text.append(tasted)
+    }
+
+    const score = document.createElement(rating.link ? 'a' : 'span')
+    score.className = 'bp-top-rating'
+    if (score instanceof HTMLAnchorElement && rating.link) {
+      score.href = rating.link
+      score.target = '_blank'
+      score.rel = 'noopener noreferrer'
+    }
+    score.setAttribute('aria-label', ratingLabel(rating))
+    const votes = document.createElement('span')
+    votes.className = 'bp-card-votes'
+    votes.textContent = `(${formatCount(rating.votes)})`
+    score.append(
+      createRatingIcons(product.type, rating.rating),
+      createScore(rating.rating, 'bp-card-score'),
+      votes
+    )
+
+    item.append(rank, image, text, score)
+    list.append(item)
+  })
+  return list
 }
 
 // The line a card's badge goes under: the "750 ml · 13 % vol. · Nr 223701"
@@ -1568,8 +1711,11 @@ function formatCount(count: number): string {
   return countFormat.format(count)
 }
 
+// The way the site prints a price: "99:-", "89:90".
 function formatPrice(price: number): string {
-  return priceFormat.format(price)
+  const kronor = Math.floor(price)
+  const ore = Math.round((price - kronor) * 100)
+  return `${formatCount(kronor)}:${ore === 0 ? '-' : String(ore).padStart(2, '0')}`
 }
 
 function formatScore(score: number): string {

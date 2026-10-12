@@ -1,4 +1,5 @@
 allVintages: alla årgångar
+and: och
 brewery: Bryggeri
 cancel: Avbryt
 checkedInOnUntappd: Incheckad på Untappd
@@ -14,6 +15,7 @@ noMatch: Tyvärr, vi kunde inte hitta något betyg för denna produkt.
 noRatingYet: Inte tillräckligt många betyg än
 notOnBottle: Vinet är inte på flaska
 of: av
+products: 1 vara | {count} varor
 rating: Betyg
 searchAtUntappd: Sök hos Untappd
 searchAtVivino: Sök hos Vivino
@@ -23,17 +25,33 @@ sortRating: Betyg
 sortValue: Prisvärt
 tasted: Provad
 topList: Topp 10
-topListEmpty: Hittade inga betyg för de här produkterna.
-topListFailed: Kunde inte hämta sortimentet.
-topListFetching: Hämtar sortimentet
-topListFootRated: produkter hade ett betyg att ranka på.
-topListFootSkipped: boxar och påsar räknas inte – Vivino betygsätter bara flaskor.
-topListFootTasted: provade är dolda.
-topListNoSearch: Hittade ingen sökning att ranka. Ändra ett filter och försök igen.
-topListRating: Hämtar betyg
+topListAllTasted: Du har provat alla betygsatta varor i urvalet. Stäng av ”Dölj provade” för att se dem.
+topListButtonTitle: Rangordnar alla varor som matchar filtren efter betyg – inte bara de som syns på sidan
+topListChanged: Urvalet har ändrats sedan listan togs fram.
+topListConfirm: Urvalet har {count}. Att hämta betyg för alla tar ungefär {minutes} min. Välj en butik eller fler filter för en kortare lista – eller kör ändå.
+topListDone: Topp 10 är klar
+topListEmpty: Ingen av varorna i urvalet har något betyg på {source}.
+topListFailed: Kunde inte hämta varorna i urvalet.
+topListFootRated: Betyg finns för {rated} av {total}.
+topListFootSkipped: Varor i box, burk eller annan förpackning än flaska ({count}) är inte med – Vivino betygsätter bara flaskor.
+topListFootTasted: 1 provad vara är dold. | {count} provade varor är dolda.
+topListFootTime: Hämtad {time}.
+topListFootUncertain: Säker träff saknas för {count}.
+topListIncomplete: Betyg kunde inte hämtas för {count}, så listan kan sakna varor.
+topListLoading: Hämtar varorna i urvalet – {done} av {total}
+topListNoSearch: Kunde inte läsa av urvalet. Ladda om sidan och försök igen.
+topListNoneFetched: Inga betyg kunde hämtas.
+topListPaused: Sökningarna mot {source} är pausade till kl. {time} – sidan svarar inte just nu, troligen för att vi sökt för mycket på kort tid.
+topListRating: Hämtar betyg – {done} av {total}
+topListRatingFailed: Hämtar betyg – {done} av {total} ({failed} misslyckades)
+topListReading: Läser av urvalet …
+topListRefresh: Kör igen
+topListRetry: Försök igen
 topListRunAnyway: Kör ändå
-topListSlow: produkter. Att hämta betyg för alla kan ta flera minuter – välj en butik eller fler filter för att korta listan, eller kör ändå.
-topListTooMany: produkter är för många att ranka. Välj en butik eller fler filter så att listan blir högst
+topListRunNew: Kör för det nya urvalet
+topListRunning: Hämtar betyg för Topp 10
+topListScope: Bland {count} i ditt urval, efter betyg på {source}
+topListTooMany: Urvalet har {count} – för många för att rangordna. Välj en butik eller fler filter så att det blir högst {max} varor.
 uncertainMatch: Kunde inte hitta en exakt matchning, du kan själv söka via länken nedan.
 undo: Ångra
 vintage: Årgång

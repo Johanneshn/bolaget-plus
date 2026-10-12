@@ -48,6 +48,8 @@ export interface TopListEntry {
 // need.
 export interface TopListProduct {
   facts: ProductFacts
+  // The site's own thumbnail of the bottle, the one its cards show.
+  imageUrl?: string
   isBottle: boolean
   name: string
   price: number
@@ -84,37 +86,45 @@ export async function fetchAllProducts(
   }
 ): Promise<null | { products: TopListProduct[] } | { tooMany: number }> {
   const { confirmTotal, onProgress, signal } = options
-  const products: TopListProduct[] = []
+  const products = new Map<string, TopListProduct>()
   let loaded = 0
-  for (let page = 1; page <= Math.ceil(MAX_PRODUCTS / PAGE_SIZE); page++) {
+  // Fixed at the first page: a product added to the range mid-run must not
+  // turn a run under way into one "too long to rank".
+  let total = 0
+  // Pages are asked for until the total is reached, not by the API's nextPage,
+  // which a run must not depend on to see the whole list; the bound stops a
+  // total that is never reached (products leaving the range mid-run).
+  for (let page = 1; page <= Math.ceil(MAX_PRODUCTS / PAGE_SIZE) + 1; page++) {
     const json = await fetchSearchPage(searchUrl, page, signal)
     const hits = json.products ?? []
-    loaded += hits.length
-    const total = json.metadata?.docCount ?? loaded
-    if (total > MAX_PRODUCTS) return { tooMany: total }
-    if (page === 1 && confirmTotal && !(await confirmTotal(total))) return null
-    for (const raw of hits) {
-      const product = toTopListProduct(raw)
-      if (product) products.push(product)
+    if (page === 1) {
+      total = json.metadata?.docCount ?? hits.length
+      if (total > MAX_PRODUCTS) return { tooMany: total }
+      if (confirmTotal && !(await confirmTotal(total))) return null
     }
-    onProgress(loaded, total)
-    // The API marks the last page with nextPage -1.
-    const next = json.metadata?.nextPage ?? -1
-    if (next <= page) break
+    loaded += hits.length
+    for (const raw of hits) {
+      // A product the range shifted onto the next page too is looked up once.
+      const product = toTopListProduct(raw)
+      if (product) products.set(product.productId, product)
+    }
+    onProgress(Math.min(loaded, total), total)
+    if (hits.length === 0 || loaded >= total) break
   }
-  return { products }
+  return { products: [...products.values()] }
 }
 
 // The search behind the list on screen: the most recent one whose total is
 // the "N varor" the page shows. Each candidate costs one request, newest
-// first, so the right one is usually the first or second asked. Without a
-// count to go by, the newest search it is.
+// first, so the right one is usually the first or second asked.
 export async function findListSearch(
   count: null | number,
   signal?: AbortSignal
 ): Promise<null | string> {
+  // Without a count to tell the list's search from the others, there is no
+  // telling which one it is: better no list than another list's.
+  if (count === null) return null
   const candidates = [...recentSearches].reverse()
-  if (count === null) return candidates[0] ?? null
   for (const url of candidates) {
     const page = await fetchSearchPage(url, 1, signal)
     if (page.metadata?.docCount === count) return url
@@ -128,8 +138,17 @@ export function isRated(rating: RatingResponse): boolean {
   return rating.status === RatingResultStatus.Found && rating.rating > 0
 }
 
+// Whether the site recorded this search since the page was loaded — that is,
+// whether a saved list was made from the list on screen. The search carries
+// the store, which the page URL does not.
+export function isRecentSearch(url: string): boolean {
+  return recentSearches.includes(url)
+}
+
 // The rated products, best first. A rating with few votes says little, so a
-// tie — or near enough to round to one — goes to the wine more people rated.
+// tie — the same score as printed, one decimal for Vivino and two for
+// Untappd — goes to the wine more people rated. Ties are judged at the printed
+// precision, not coarser: a list showing 3,46 above 3,5 reads as a bug.
 // Vivino rates a wine, not a bottle size, so the 375 ml and 750 ml of one wine
 // would take two places with the same rating; each wine is listed once, in the
 // size closest to a standard bottle. With "Dölj provade" on, tasted ones make
@@ -138,13 +157,7 @@ export function rankTopList(
   entries: TopListEntry[],
   { hideTasted = false, limit = 10 } = {}
 ): TopListEntry[] {
-  // Tasted is marked per product, but listed per wine: having had the 750 ml
-  // counts for the 375 ml too, or hiding one bottle would promote the other.
-  const wineOf = (entry: TopListEntry) =>
-    entry.rating.link ?? entry.product.productId
-  const tastedWines = new Set(
-    entries.filter((entry) => entry.tasted).map(wineOf)
-  )
+  const tastedWines = tastedWinesOf(entries)
   const byWine = new Map<string, TopListEntry>()
   for (const entry of entries) {
     const key = wineOf(entry)
@@ -158,10 +171,18 @@ export function rankTopList(
   return [...byWine.values()]
     .sort(
       (a, b) =>
-        Math.round(b.rating.rating * 10) - Math.round(a.rating.rating * 10) ||
+        Math.round(b.rating.rating * 100) - Math.round(a.rating.rating * 100) ||
         b.rating.votes - a.rating.votes
     )
     .slice(0, limit)
+}
+
+// The rated wines the user has tasted, in any size: how many "Dölj provade"
+// takes out of the ranking.
+export function tastedWinesOf(entries: TopListEntry[]): Set<string> {
+  return new Set(
+    entries.filter((entry) => entry.tasted && isRated(entry.rating)).map(wineOf)
+  )
 }
 
 // A search result as a TopListProduct; null for anything without a name or of
@@ -183,12 +204,18 @@ export function toTopListProduct(raw: unknown): null | TopListProduct {
   const packaging = readString(product.packagingLevel1)
   const country = readString(product.country)
   const producer = readString(product.producerName)
+  const image = Array.isArray(product.images)
+    ? readString(
+        (product.images[0] as Record<string, unknown> | undefined)?.imageUrl
+      )
+    : undefined
 
   return {
     facts: {
       country: countryCodeFromName(country),
       producer
     },
+    imageUrl: image ? thumbnailUrl(image) : undefined,
     isBottle: packaging ? isBottlePackaging(packaging) : true,
     name: buildSearchName(bold, subtitle),
     price: typeof product.price === 'number' ? product.price : 0,
@@ -227,6 +254,12 @@ function distanceFromBottle({ product }: TopListEntry): number {
   return Math.abs(product.volumeMl - 750)
 }
 
+// Tasted is marked per product, but listed per wine: having had the 750 ml
+// counts for the 375 ml too, or hiding one bottle would promote the other.
+function wineOf(entry: TopListEntry): string {
+  return entry.rating.link ?? entry.product.productId
+}
+
 // The key in use: the shipped one until the API turns it away, then whatever
 // the site's bundle holds — read once per page load, as a key that fails
 // again is not one a second read would fix.
@@ -236,7 +269,11 @@ let siteApiKeyRead = false
 // What Firefox adds to a content script's globals.
 interface FirefoxContentScope {
   cloneInto?: <T>(value: T, target: object) => T
-  content?: { fetch?: typeof fetch }
+}
+
+// The page's own window, which Firefox hands a content script on request.
+interface FirefoxWindow extends Window {
+  wrappedJSObject?: { fetch?: typeof fetch }
 }
 
 async function fetchSearchPage(
@@ -248,6 +285,7 @@ async function fetchSearchPage(
   const url = new URL(searchUrl)
   url.searchParams.set('page', String(page))
   let response = await siteFetch(url.toString(), siteApiKey, signal)
+  signal?.throwIfAborted()
   // APIM answers a rotated key with 401.
   if (response.status === 401 && !siteApiKeyRead) {
     siteApiKeyRead = true
@@ -342,21 +380,34 @@ function readString(value: unknown): string | undefined {
 // that for a content script's own fetch, and the API's CORS lets the site's
 // origin in. Firefox instead sends it as the extension, which reaches only
 // the hosts in host_permissions — and adding the API's host there would ask
-// every existing user for a new permission. Its content scripts get the
-// page's own fetch as content.fetch for exactly this. The signal stays out of
-// that call (an AbortSignal from the content script is not one to the page);
-// fetchSearchPage checks it before every request instead.
+// every existing user for a new permission. So on Firefox the request goes
+// through the page's own fetch (window.wrappedJSObject; the content.fetch MDN
+// describes is not there in current releases), with its options cloned into
+// the page. The signal stays out of that call (an AbortSignal from the
+// content script is not one to the page); fetchSearchPage checks it before
+// and after every request instead.
 function siteFetch(
   url: string,
   key: string,
   signal?: AbortSignal
 ): Promise<Response> {
   const headers = { 'Ocp-Apim-Subscription-Key': key }
-  const { cloneInto, content } = globalThis as FirefoxContentScope
-  if (content?.fetch && cloneInto) {
-    return content.fetch(url, cloneInto({ headers }, content))
+  const { cloneInto } = globalThis as FirefoxContentScope
+  const page =
+    typeof window === 'undefined'
+      ? undefined
+      : (window as FirefoxWindow).wrappedJSObject
+  if (page?.fetch && cloneInto) {
+    return page.fetch(url, cloneInto({ headers }, window))
   }
   return fetch(url, { headers, signal })
+}
+
+// The thumbnail as the site's cards load it — through its own image resizer,
+// at the size a card shows — so it is the one the browser already has.
+function thumbnailUrl(image: string): string {
+  const source = encodeURIComponent(`${image}_100.webp`)
+  return `https://www.systembolaget.se/_next/image/?url=${source}&w=64&q=75`
 }
 
 function withoutPage(url: string): string {

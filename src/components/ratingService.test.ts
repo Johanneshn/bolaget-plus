@@ -9,7 +9,11 @@ import {
 } from '@/@types/types'
 import { pinMatch, unpinMatch } from '@/components/pinnedMatches'
 import { saveRating } from '@/components/ratingsCache'
-import { enqueueListFetch, fetchRating } from '@/components/ratingService'
+import {
+  enqueueListFetch,
+  fetchRating,
+  sourcePausedUntil
+} from '@/components/ratingService'
 
 const request: RatingRequest = {
   includeImage: false,
@@ -166,5 +170,142 @@ describe('an entry cached by an older version', () => {
 
     expect(fetchMock).toHaveBeenCalled()
     vi.unstubAllGlobals()
+  })
+})
+
+describe('the list lookup queue', () => {
+  beforeEach(() => {
+    fakeBrowser.reset()
+    vi.restoreAllMocks()
+  })
+
+  const vivinoHit = (name: string) =>
+    new Response(
+      JSON.stringify({
+        hits: [
+          {
+            id: 7,
+            name,
+            statistics: { ratings_average: 4.1, ratings_count: 1200 },
+            vintages: [{ id: 71, statistics: { ratings_count: 900 } }],
+            winery: { name: 'El Coto' }
+          }
+        ],
+        nbHits: 1
+      })
+    )
+
+  // A "Topp 10" run queues hundreds of lookups; a card scrolled into view
+  // during it must not wait for all of them.
+  it('serves a card before the lookups of a Topp 10 run', async () => {
+    const order: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>((_url, init) => {
+        const body = JSON.parse(init?.body as string) as { params: string }
+        order.push(new URLSearchParams(body.params).get('query') ?? '')
+        return Promise.resolve(vivinoHit('Crianza'))
+      })
+    )
+    try {
+      const bulk = ['b1', 'b2', 'b3'].map((id) =>
+        enqueueListFetch(
+          id,
+          `El Coto Bulk ${id}`,
+          ProductType.Wine,
+          {},
+          {
+            bulk: true
+          }
+        )
+      )
+      const card = enqueueListFetch('c1', 'El Coto Card', ProductType.Wine)
+      await Promise.all([...bulk, card])
+      expect(order.indexOf('El Coto Card')).toBeLessThanOrEqual(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  // A run must not query the site again for every card already badged just
+  // because it knows the producer and the card did not.
+  it('reuses a cached rating for a Topp 10 lookup that knows more', async () => {
+    await saveRating(request, rating)
+    const fetchMock = vi.fn<typeof fetch>()
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      await expect(
+        enqueueListFetch(
+          request.productId,
+          request.productName,
+          ProductType.Wine,
+          { country: 'es', producer: 'El Coto' },
+          { bulk: true }
+        )
+      ).resolves.toEqual(rating)
+      expect(fetchMock).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('drops the lookups of a cancelled run without asking the site', async () => {
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(vivinoHit('Crianza'))
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      const run = new AbortController()
+      const lookups = ['x1', 'x2', 'x3'].map((id) =>
+        enqueueListFetch(
+          id,
+          `Wine ${id}`,
+          ProductType.Wine,
+          {},
+          {
+            bulk: true,
+            signal: run.signal
+          }
+        )
+      )
+      run.abort()
+      const results = await Promise.all(lookups)
+      expect(results.every((result) => result.transient)).toBe(true)
+      expect(fetchMock).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  // A rate limit answered by more queries at the same pace only renews the
+  // ban — for the cards and product pages too.
+  it('pauses a site that keeps turning lookups away', async () => {
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(new Response('', { status: 429 }))
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      const results = await Promise.all(
+        Array.from({ length: 8 }, (_, i) =>
+          enqueueListFetch(
+            `r${String(i)}`,
+            `Wine ${String(i)}`,
+            ProductType.Wine,
+            {},
+            {
+              bulk: true
+            }
+          )
+        )
+      )
+      expect(results.every((result) => result.transient)).toBe(true)
+      // Five failures in a row open the breaker; the rest never leave.
+      expect(fetchMock).toHaveBeenCalledTimes(5)
+      expect(sourcePausedUntil(ProductType.Wine)).toBeGreaterThan(Date.now())
+      // Untappd is another site, and is not paused with Vivino.
+      expect(sourcePausedUntil(ProductType.Beer)).toBe(0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

@@ -24,3 +24,38 @@ const messages = new Map(
 export function t(key: MessageKey): string {
   return messages.get(key) ?? key
 }
+
+const countFormat = new Intl.NumberFormat('sv-SE')
+
+// A message with its {placeholders} filled in. Numbers are written the way the
+// page around them writes them ("1 500").
+export function tf(
+  key: MessageKey,
+  values: Partial<Record<string, number | string>>
+): string {
+  return fill(t(key), values)
+}
+
+// A message in the form for `count` — "1 vara | {count} varor" — filled in.
+export function tn(
+  key: MessageKey,
+  count: number,
+  values: Partial<Record<string, number | string>> = {}
+): string {
+  const forms = t(key).split(' | ')
+  return fill(count === 1 ? forms[0] : forms[forms.length - 1], {
+    ...values,
+    count
+  })
+}
+
+function fill(
+  message: string,
+  values: Partial<Record<string, number | string>>
+): string {
+  return message.replace(/\{(\w+)\}/g, (placeholder, name: string) => {
+    const value = values[name]
+    if (value === undefined) return placeholder
+    return typeof value === 'number' ? countFormat.format(value) : value
+  })
+}

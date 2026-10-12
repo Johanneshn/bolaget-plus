@@ -119,15 +119,83 @@ function isMissingImages(rating: RatingResponse, type: ProductType): boolean {
 
 const LIST_FETCH_DELAY_MS = 300
 
-let listFetchQueue: Promise<undefined> = Promise.resolve(undefined)
+// What a lookup that never reached the network answers: cancelled, or held
+// back while its source is paused. Transient, so nothing caches it.
+const NOT_FETCHED: RatingResponse = {
+  link: null,
+  name: null,
+  rating: 0,
+  status: RatingResultStatus.NotFound,
+  transient: true,
+  votes: 0
+}
+
+// The lookups waiting for their turn, in two lanes paced as one: a card the
+// user is looking at goes before the hundreds a "Topp 10" run queues, or the
+// cards scrolled to during a run would sit as spinners until it ends.
+interface QueuedLookup {
+  run: () => Promise<void>
+  skip: () => void
+  // Whether its turn may be skipped without a wait: cancelled, or its source
+  // paused.
+  skippable: () => boolean
+}
+const cardLane: QueuedLookup[] = []
+const bulkLane: QueuedLookup[] = []
+let draining = false
+
+async function drainLanes() {
+  if (draining) return
+  draining = true
+  try {
+    for (;;) {
+      const next = cardLane.shift() ?? bulkLane.shift()
+      if (!next) break
+      if (next.skippable()) {
+        next.skip()
+        continue
+      }
+      await new Promise((resolve) => setTimeout(resolve, LIST_FETCH_DELAY_MS))
+      await next.run()
+    }
+  } finally {
+    draining = false
+  }
+}
+
+// A circuit breaker per rating site. Vivino and Untappd answer a burst of
+// queries with 429s, and a ban outlasts the burst: going on at the queue's
+// pace would only renew it, for the cards and product pages too, which share
+// the key and the IP. So after BREAKER_FAILURES transient failures in a row
+// the site is left alone for a while, doubling each time it is still failing,
+// and the first lookup after the pause decides whether it is over.
+const BREAKER_FAILURES = 5
+const BREAKER_FIRST_PAUSE_MS = 60_000
+const BREAKER_MAX_PAUSE_MS = 10 * 60_000
+interface Breaker {
+  failures: number
+  nextPause: number
+  pausedUntil: number
+  // Paused at least once since the last success: the next failure pauses it
+  // again at once.
+  tripped: boolean
+}
+const breakers = new Map<'untappd' | 'vivino', Breaker>()
 
 export async function enqueueListFetch(
   productId: string,
   productName: string,
   type: ProductType,
   facts: ProductFacts = {},
-  signal?: AbortSignal
+  options: {
+    // A "Topp 10" lookup: it waits behind the cards, and a cached rating
+    // serves it even when it knows a fact the entry was matched without — a
+    // run should not query the site again for every card already badged.
+    bulk?: boolean
+    signal?: AbortSignal
+  } = {}
 ): Promise<RatingResponse> {
+  const { bulk = false, signal } = options
   // Cached ratings render immediately — only real network fetches go through
   // the throttled queue, so a revisited list page fills in instantly instead
   // of trickling one badge per delay tick.
@@ -135,40 +203,102 @@ export async function enqueueListFetch(
   if (pinned) {
     return pinned
   }
-  const cached = await tryGetRating({
+  const request = {
     ...facts,
     includeImage: false,
     productId,
     productName,
     query: type
-  }).catch(() => null)
+  }
+  if (bulk) {
+    // Asked without the facts, the cache answers with whatever it holds; a
+    // rating found is kept, anything less gets its chance at the facts below.
+    const known = await tryGetRating({
+      includeImage: false,
+      productId,
+      productName,
+      query: type
+    }).catch(() => null)
+    if (known?.status === RatingResultStatus.Found) {
+      return known
+    }
+  }
+  const cached = await tryGetRating(request).catch(() => null)
   if (cached) {
     return cached
   }
 
-  const task = listFetchQueue.then(
-    () =>
-      new Promise<RatingResponse>((resolve) => {
-        // A cancelled "Topp 10" run leaves its place in the queue at once, so
-        // it does not hold up the badges queued behind it.
-        if (signal?.aborted) {
-          resolve({
-            link: null,
-            name: null,
-            rating: 0,
-            status: RatingResultStatus.NotFound,
-            transient: true,
-            votes: 0
-          })
+  return new Promise<RatingResponse>((resolve) => {
+    const lookup: QueuedLookup = {
+      run: async () => {
+        if (lookup.skippable()) {
+          resolve(NOT_FETCHED)
           return
         }
-        setTimeout(() => {
-          void fetchRating(productId, productName, type, false, facts).then(
-            resolve
-          )
-        }, LIST_FETCH_DELAY_MS)
-      })
-  )
-  listFetchQueue = task.then(() => undefined)
-  return task
+        const rating = await fetchRating(
+          productId,
+          productName,
+          type,
+          false,
+          facts
+        )
+        recordLookup(type, rating)
+        resolve(rating)
+      },
+      skip: () => {
+        resolve(NOT_FETCHED)
+      },
+      skippable: () => signal?.aborted === true || sourcePausedUntil(type) > 0
+    }
+    const lane = bulk ? bulkLane : cardLane
+    lane.push(lookup)
+    // A cancelled "Topp 10" run leaves the queue at once, so a later run or
+    // card is not held up behind its leftovers.
+    signal?.addEventListener(
+      'abort',
+      () => {
+        const index = lane.indexOf(lookup)
+        if (index === -1) return
+        lane.splice(index, 1)
+        lookup.skip()
+      },
+      { once: true }
+    )
+    void drainLanes()
+  })
+}
+
+// When the site rating products of this type may be asked again, as a
+// timestamp; 0 when it is not paused.
+export function sourcePausedUntil(type: ProductType): number {
+  const breaker = breakers.get(sourceOf(type))
+  return breaker && breaker.pausedUntil > Date.now() ? breaker.pausedUntil : 0
+}
+
+function recordLookup(type: ProductType, rating: RatingResponse) {
+  const source = sourceOf(type)
+  const breaker = breakers.get(source) ?? {
+    failures: 0,
+    nextPause: BREAKER_FIRST_PAUSE_MS,
+    pausedUntil: 0,
+    tripped: false
+  }
+  breakers.set(source, breaker)
+  if (!rating.transient) {
+    breaker.failures = 0
+    breaker.nextPause = BREAKER_FIRST_PAUSE_MS
+    breaker.tripped = false
+    return
+  }
+  breaker.failures++
+  if (breaker.tripped || breaker.failures >= BREAKER_FAILURES) {
+    breaker.pausedUntil = Date.now() + breaker.nextPause
+    breaker.nextPause = Math.min(breaker.nextPause * 2, BREAKER_MAX_PAUSE_MS)
+    breaker.failures = 0
+    breaker.tripped = true
+  }
+}
+
+function sourceOf(type: ProductType): 'untappd' | 'vivino' {
+  return type === ProductType.Wine ? 'vivino' : 'untappd'
 }

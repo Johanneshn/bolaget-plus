@@ -43,6 +43,10 @@ const MAX_ALTERNATIVES = 3
 
 // A hung image download must not hold up the rating itself.
 const IMAGE_FETCH_TIMEOUT_MS = 4000
+// How long a rating search may take. Without a limit a request that hangs
+// holds up the whole list-page queue behind it, every card and a "Topp 10" run
+// included; timed out, it is a transient failure like any other.
+const SEARCH_TIMEOUT_MS = 10_000
 
 // Style/format words that are shared across thousands of unrelated wines. On
 // their own they must never be enough to accept a match: "Blanc de Noirs Brut"
@@ -244,7 +248,8 @@ export async function fetchRatingFromUntappd(
       headers: {
         'Content-Type': 'text/plain'
       },
-      method: 'POST'
+      method: 'POST',
+      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS)
     })
 
     if (!response.ok) {
@@ -354,7 +359,8 @@ export async function fetchRatingFromVivino(
         'X-Algolia-API-Key': VIVINO_ALGOLIA_SEARCH_KEY,
         'X-Algolia-Application-Id': VIVINO_ALGOLIA_APP_ID
       },
-      method: 'POST'
+      method: 'POST',
+      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS)
     })
 
     // HTTP errors (429 rate limit, 5xx) are transient — show the search-link
