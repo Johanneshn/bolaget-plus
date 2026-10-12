@@ -466,6 +466,10 @@ const STYLES = `
     cursor: pointer;
   }
   .bp-top-run:hover { border-color: ${FG}; }
+  .bp-top-run:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
   .bp-top progress {
     display: block;
     width: 100%;
@@ -1450,7 +1454,7 @@ const NO_SCORE = '–'
 // so each state of a run — and of a list brought back later — reads the same.
 export interface TopListPanelState {
   // Buttons under the text: run anyway, retry, run again.
-  actions?: { label: string; onClick: () => void }[]
+  actions?: { disabled?: boolean; label: string; onClick: () => void }[]
   entries?: TopListEntry[]
   // Small print under the list: what was counted and what was left out.
   footnote?: string
@@ -1600,6 +1604,7 @@ export function renderTopList(
       button.type = 'button'
       button.className = 'bp-top-run'
       button.textContent = action.label
+      button.disabled = action.disabled ?? false
       button.addEventListener('click', action.onClick)
       actions.append(button)
     }

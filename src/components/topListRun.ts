@@ -53,6 +53,8 @@ interface SavedTopList {
   searchUrl: string
   skipped: number
   sources: string[]
+  // Products of a kind the popup has switched off.
+  switchedOff: number
   // Products the lookup could not match for certain.
   uncertain: number
 }
@@ -65,6 +67,12 @@ interface Shown {
   listCount: null | number
   panel: HTMLElement
   saved?: SavedTopList
+}
+
+const SECTION_TYPES: Partial<Record<string, ProductType>> = {
+  'cider-blanddrycker': ProductType.Cider,
+  ol: ProductType.Beer,
+  vin: ProductType.Wine
 }
 
 // Kept for a day at most: the ratings it holds are cached for as long.
@@ -117,10 +125,16 @@ export function checkTopList(hooks: TopListHooks): void {
       running: false,
       status: t('topListChanged')
     })
-  } else if (!changed && shown.changed && shown.saved) {
-    // Back on the list it was made for.
+  } else if (!changed && shown.changed) {
+    // Back on the list it was made for: show it again, or — when the change
+    // cut the run short — nothing that talks of a new selection.
     shown.changed = false
-    void showSaved(shown, hooks)
+    if (shown.saved) {
+      void showSaved(shown, hooks)
+    } else {
+      shown.panel.remove()
+      shown = null
+    }
   }
 }
 
@@ -165,18 +179,44 @@ export async function runTopList(
 // Whether Topp 10 is offered on this list page: not where nothing can be
 // rated (spirits, alcohol-free, gift items), which would only fetch pages to
 // say so.
-export function topListOffered(): boolean {
-  return !/^\/sortiment\/(alkoholfritt|presentartiklar|sprit|tobak)/.test(
-    location.pathname
-  )
+export async function topListOffered(hooks: TopListHooks): Promise<boolean> {
+  const section = /^\/sortiment\/([^/]+)/.exec(location.pathname)?.[1]
+  if (
+    section &&
+    ['alkoholfritt', 'presentartiklar', 'sprit', 'tobak'].includes(section)
+  ) {
+    return false
+  }
+  // A section whose ratings are switched off in the popup: there would be
+  // nothing to rank.
+  const type = SECTION_TYPES[section ?? '']
+  return type === undefined || (await hooks.featureEnabled(type))
 }
 
-// The page and its filters — not which page of results is shown ("&p=2"):
-// paging through the list keeps the selection Topp 10 was made for.
+// Whether a run is going: a Topp 10 button the site renders afresh mid-run is
+// marked busy from the start.
+export function topListRunning(): boolean {
+  return activeRun !== null
+}
+
+// The page and its filters — not which page of results is shown ("&p=2") or
+// how the site orders them: paging or re-sorting the list keeps the selection
+// Topp 10 was made for.
 function currentHref(): string {
   const params = new URLSearchParams(location.search)
-  params.delete('p')
-  params.delete('page')
+  // The parameters the site itself treats as not filtering: paging and the
+  // order of the list (its own sort, "sortera-pa" / "i-riktning").
+  for (const param of [
+    'p',
+    'page',
+    'size',
+    'sortBy',
+    'sortDirection',
+    'sortera-pa',
+    'i-riktning'
+  ]) {
+    params.delete(param)
+  }
   const search = params.toString()
   return location.pathname + (search ? `?${search}` : '')
 }
@@ -192,6 +232,14 @@ function endRun() {
 // The list the panel goes with: the one after the list controls.
 function findList(): Element | null {
   return document.querySelector('.bp-sort')?.nextElementSibling ?? null
+}
+
+// A time of day: "14:30".
+function formatClock(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('sv-SE', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 function formatTime(timestamp: number): string {
@@ -222,12 +270,18 @@ function loadTopList(): null | SavedTopList {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY)
     if (raw === loaded.raw) return loaded.parsed
-    const saved = raw ? (JSON.parse(raw) as Partial<SavedTopList>) : null
+    // Read as unknown values: the tab may hold a list an older version saved.
+    const saved = raw
+      ? (JSON.parse(raw) as Partial<Record<keyof SavedTopList, unknown>>)
+      : null
     const parsed =
       Array.isArray(saved?.entries) &&
       typeof saved.href === 'string' &&
-      typeof saved.paused === 'object'
-        ? (saved as SavedTopList)
+      typeof saved.searchUrl === 'string' &&
+      typeof saved.savedAt === 'number' &&
+      typeof saved.paused === 'object' &&
+      saved.paused !== null
+        ? (saved as unknown as SavedTopList)
         : null
     loaded = { parsed, raw }
     return parsed
@@ -366,6 +420,10 @@ async function rankList(
     enabled.set(type, await hooks.featureEnabled(type))
   }
   if (!live()) return
+  // Products of a kind with ratings, whatever the popup says about them.
+  const rateableKinds = found.products.filter(
+    (product) => !(product.type === ProductType.Wine && !product.isBottle)
+  )
   const rateable = found.products.filter(
     (product) =>
       enabled.get(product.type) &&
@@ -467,6 +525,7 @@ async function rankList(
       (product) => product.type === ProductType.Wine && !product.isBottle
     ).length,
     sources,
+    switchedOff: rateableKinds.length - rateable.length,
     uncertain: entries.filter(
       ({ rating }) =>
         rating.status === RatingResultStatus.Uncertain && !rating.transient
@@ -543,16 +602,16 @@ async function showSaved(current: Shown, hooks: TopListHooks) {
   const source = joinSources(saved.sources)
 
   const footnote = [
-    tf('topListFootRated', {
-      rated: entries.length,
-      total: tn('products', saved.looked)
-    }),
+    entries.length > 0
+      ? tf('topListFootRated', {
+          rated: entries.length,
+          total: tn('products', saved.looked)
+        })
+      : null,
     saved.uncertain > 0
       ? tf('topListFootUncertain', { count: tn('products', saved.uncertain) })
       : null,
-    saved.skipped > 0
-      ? tf('topListFootSkipped', { count: saved.skipped })
-      : null,
+    saved.skipped > 0 ? tn('topListFootSkipped', saved.skipped) : null,
     hidden > 0 ? tn('topListFootTasted', hidden) : null,
     tf('topListFootTime', { time: formatTime(saved.savedAt) })
   ]
@@ -570,7 +629,7 @@ async function showSaved(current: Shown, hooks: TopListHooks) {
           ...stillPaused.map(([pausedSource, until = 0]) =>
             tf('topListPaused', {
               source: pausedSource,
-              time: formatTime(until)
+              time: formatClock(until)
             })
           ),
           noneFetched
@@ -582,20 +641,36 @@ async function showSaved(current: Shown, hooks: TopListHooks) {
       : undefined
   const status =
     saved.looked === 0
-      ? t('topListNothingToRank')
-      : ranked.length > 0 || noneFetched
-        ? undefined
+      ? t(saved.switchedOff > 0 ? 'topListSwitchedOff' : 'topListNothingToRank')
+      : ranked.length > 0 || saved.failed > 0
+        ? // With lookups missing, the warning says why the list is short.
+          undefined
         : entries.length === 0
           ? tf('topListEmpty', { source })
           : t('topListAllTasted')
+  // Asking again during a pause would only be turned away.
+  const pausedTill = Math.max(0, ...stillPaused.map(([, until = 0]) => until))
+  if (pausedTill > 0) {
+    // Offered again, and the pause notice dropped, once the pause is over.
+    setTimeout(
+      () => {
+        refreshTopList(hooks)
+      },
+      pausedTill - Date.now() + 1000
+    )
+  }
   const nothing = noneFetched || saved.looked === 0
 
   render(current, hooks, {
     actions: [
       {
+        disabled: pausedTill > 0,
         // Ratings found are cached, so a second run only asks again for the
         // ones that failed.
-        label: t(saved.failed > 0 ? 'topListRetry' : 'topListRefresh'),
+        label:
+          pausedTill > 0
+            ? tf('topListRetryAt', { time: formatClock(pausedTill) })
+            : t(saved.failed > 0 ? 'topListRetry' : 'topListRefresh'),
         onClick: () => {
           const list = findList()
           if (list) void runTopList(list, hooks)

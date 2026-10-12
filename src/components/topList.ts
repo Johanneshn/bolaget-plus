@@ -286,38 +286,33 @@ async function fetchSearchPage(
   signal?.throwIfAborted()
   const url = new URL(searchUrl)
   url.searchParams.set('page', String(page))
-  let response = await withDeadline(
-    siteFetch(url.toString(), siteApiKey, signal),
-    signal
-  )
+  let response = await searchOnce(url.toString(), siteApiKey, signal)
   // APIM answers a rotated key with 401.
   if (response.status === 401 && !siteApiKeyRead) {
     siteApiKeyRead = true
     const key = await readSiteApiKey()
     if (key && key !== siteApiKey) {
       siteApiKey = key
-      response = await withDeadline(
-        siteFetch(url.toString(), siteApiKey, signal),
-        signal
-      )
+      response = await searchOnce(url.toString(), siteApiKey, signal)
     }
   }
-  if (!response.ok) {
+  if (response.status < 200 || response.status > 299) {
     throw new Error(`Search failed: ${String(response.status)}`)
   }
-  // Parsed here rather than with response.json(): on Firefox the response
-  // belongs to the page, and so would the objects json() made.
-  return JSON.parse(await response.text()) as SearchPage
+  return JSON.parse(response.body) as SearchPage
 }
 
 function isListSearch(url: string): boolean {
   try {
     const parsed = new URL(url)
-    // A free-text search from the header is a search too, but not the list
-    // being looked at.
-    return (
-      SEARCH_PATH.test(parsed.pathname) && !parsed.searchParams.has('textQuery')
-    )
+    if (!SEARCH_PATH.test(parsed.pathname)) return false
+    // The header's search box searches as the user types; those are not the
+    // list being looked at — unless the list is the results of that very
+    // search ("/sortiment/?q=primitivo").
+    const text = parsed.searchParams.get('textQuery')
+    if (text === null) return true
+    const page = new URLSearchParams(location.search)
+    return (page.get('q') ?? page.get('textQuery')) === text
   } catch {
     return false
   }
@@ -366,9 +361,13 @@ async function readSiteApiKey(): Promise<null | string> {
   const keys = await Promise.all(
     sources.map(async (source) => {
       try {
-        const response = await fetch(source)
-        if (!response.ok) return null
-        return SITE_API_KEY_PATTERN.exec(await response.text())?.[1] ?? null
+        const text = await withDeadline(
+          (async () => {
+            const response = await fetch(source)
+            return response.ok ? await response.text() : ''
+          })()
+        )
+        return SITE_API_KEY_PATTERN.exec(text)?.[1] ?? null
       } catch {
         return null
       }
@@ -381,6 +380,23 @@ function readString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const trimmed = value.trim()
   return trimmed ? trimmed : undefined
+}
+
+// One search request, its body read in full: a body that stalls is as stuck
+// as a request that does. Read here rather than with response.json(): on
+// Firefox the response belongs to the page, and so would json()'s objects.
+function searchOnce(
+  url: string,
+  key: string,
+  signal?: AbortSignal
+): Promise<{ body: string; status: number }> {
+  return withDeadline(
+    (async () => {
+      const response = await siteFetch(url, key, signal)
+      return { body: await response.text(), status: response.status }
+    })(),
+    signal
+  )
 }
 
 // A request to the search API, sent as the page would send it. Chrome does
@@ -457,8 +473,12 @@ function withDeadline<T>(
   })
 }
 
+// The search without what only orders or pages it: scrolling to page 2 or
+// re-sorting the list repeats the same search, which a run ranks the same.
 function withoutPage(url: string): string {
   const parsed = new URL(url)
-  parsed.searchParams.delete('page')
+  for (const param of ['page', 'size', 'sortBy', 'sortDirection']) {
+    parsed.searchParams.delete(param)
+  }
   return parsed.toString()
 }

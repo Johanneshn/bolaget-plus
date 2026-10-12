@@ -9,6 +9,7 @@ import {
   getCardPricePerLitre,
   getCardProductId,
   getCardProductType,
+  getListCount,
   getProducer,
   getProductName,
   getProductVintage,
@@ -345,5 +346,26 @@ describe('the list card and the product page agree', () => {
     // Asserted rather than implied: two nulls would satisfy the comparison.
     expect(getCardName(card)).not.toBeNull()
     expect(getCardName(card)).toBe(getProductName())
+  })
+})
+
+describe('the result count above a list', () => {
+  const render = (html: string) => {
+    document.body.innerHTML = `<main>${html}</main>`
+  }
+
+  // "Topp 10 av N" and the choice of the search to replay both rest on it.
+  it('reads "N varor" and "1 vara", with the space the site uses', () => {
+    render('<p>1 vara</p>')
+    expect(getListCount()).toBe(1)
+    render('<div><span>1 500 varor</span></div>')
+    expect(getListCount()).toBe(1500)
+    render('<span>1\u00a0500 varor</span>')
+    expect(getListCount()).toBe(1500)
+  })
+
+  it('is null when the page shows no count', () => {
+    render('<p>Visar varor från Italien</p><p>12 varor i lager</p>')
+    expect(getListCount()).toBeNull()
   })
 })

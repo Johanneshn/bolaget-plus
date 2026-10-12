@@ -26,33 +26,35 @@ sortValue: Prisvärt
 tasted: Provad
 topList: Topp 10
 topListAllTasted: Du har provat alla betygsatta varor i urvalet. Stäng av ”Dölj provade” för att se dem.
-topListButtonTitle: Rangordnar alla varor som matchar filtren efter betyg – inte bara de som syns på sidan
+topListButtonTitle: Rangordnar efter betyg alla varor som matchar filtren – inte bara de som syns på sidan
 topListChanged: Urvalet har ändrats sedan listan togs fram.
-topListConfirm: Urvalet har {count}. Att hämta betyg för alla tar ungefär {minutes} min. Välj en butik eller fler filter för en kortare lista – eller kör ändå.
+topListConfirm: Urvalet innehåller {count}. Att hämta betyg för alla tar ungefär {minutes} min. Välj en butik eller fler filter för en kortare lista – eller fortsätt ändå.
 topListDone: Topp 10 är klar
 topListEmpty: Ingen av varorna i urvalet har något betyg på {source}.
 topListFailed: Kunde inte hämta varorna i urvalet.
 topListFootRated: Betyg finns för {rated} av {total}.
-topListFootSkipped: Varor i box, burk eller annan förpackning än flaska ({count}) är inte med – Vivino betygsätter bara flaskor.
+topListFootSkipped: 1 vara i box, burk eller annan förpackning än flaska är inte med – Vivino betygsätter bara flaskor. | {count} varor i box, burk eller annan förpackning än flaska är inte med – Vivino betygsätter bara flaskor.
 topListFootTasted: 1 provad vara är dold. | {count} provade varor är dolda.
 topListFootTime: Hämtad {time}.
-topListFootUncertain: Säker träff saknas för {count}.
+topListFootUncertain: Ingen säker träff för {count}.
 topListIncomplete: Betyg kunde inte hämtas för {count}, så listan kan sakna varor.
 topListLoading: Hämtar varorna i urvalet – {done} av {total}
 topListNoSearch: Kunde inte läsa av urvalet. Ladda om sidan och försök igen.
 topListNoneFetched: Inga betyg kunde hämtas.
 topListNothingToRank: Inga varor i urvalet går att rangordna – Topp 10 gäller vin på flaska, öl och cider.
-topListPaused: Just nu svarar {source} inte, troligen för att vi sökt för mycket på kort tid. Bolaget+ väntar med nya sökningar dit till kl. {time}.
+topListPaused: Just nu svarar {source} inte – troligen för att Bolaget+ har sökt för mycket på kort tid. Nya sökningar dit väntar till kl. {time}.
 topListRating: Hämtar betyg – {done} av {total}
 topListRatingFailed: Hämtar betyg – {done} av {total} ({failed} misslyckades)
 topListReading: Läser av urvalet …
-topListRefresh: Kör igen
+topListRefresh: Uppdatera
 topListRetry: Försök igen
-topListRunAnyway: Kör ändå
-topListRunNew: Kör för det nya urvalet
+topListRetryAt: Försök igen kl. {time}
+topListRunAnyway: Fortsätt ändå
+topListRunNew: Ta fram för det nya urvalet
 topListRunning: Hämtar betyg för Topp 10
 topListScope: Bland {count} i ditt urval, efter betyg på {source}
-topListTooMany: Urvalet har {count} – för många för att rangordna. Välj en butik eller fler filter så att det blir högst {max} varor.
+topListSwitchedOff: Betygen för varorna i urvalet är avstängda i Bolaget+.
+topListTooMany: Urvalet innehåller {count} – för många för att rangordna. Välj en butik eller fler filter så att det blir högst {max} varor.
 uncertainMatch: Kunde inte hitta en exakt matchning, du kan själv söka via länken nedan.
 undo: Ångra
 vintage: Årgång

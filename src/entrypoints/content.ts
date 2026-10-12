@@ -31,7 +31,8 @@ import {
   refreshTopList,
   runTopList,
   type TopListHooks,
-  topListOffered
+  topListOffered,
+  topListRunning
 } from '@/components/topListRun'
 
 export default defineContentScript({
@@ -58,8 +59,11 @@ export default defineContentScript({
       const card = productUtils.getCard(link)
       listCardObserver.observe(card)
       // With Bolaget+ switched off the list is left as the site made it.
-      void featuresEnabled.getValue().then((enabled) => {
-        if (enabled) addListControls(card)
+      void Promise.all([
+        featuresEnabled.getValue(),
+        topListOffered(topListHooks)
+      ]).then(([enabled, offered]) => {
+        if (enabled) addListControls(card, offered)
       })
     })
     watchListCount()
@@ -122,15 +126,17 @@ async function handleListCard(card: Element) {
     producer: productUtils.getProducer(productId) ?? undefined
   })
   domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
-  // Held back while its rating site is paused: try again once it is over,
-  // rather than leave the card bare for the rest of the visit.
-  const pausedUntil = rating.transient ? sourcePausedUntil(productType) : 0
-  if (pausedUntil > 0) {
+  // Not answered (rate limit, network, a paused site): try again later —
+  // once the pause is over, or in a minute — rather than leave the card bare
+  // for the rest of the visit. A site that keeps failing is paused by the
+  // breaker, which bounds what these retries can send.
+  if (rating.transient) {
+    const pausedUntil = sourcePausedUntil(productType)
     setTimeout(
       () => {
         if (card.isConnected) void handleListCard(card)
       },
-      pausedUntil - Date.now() + 1000
+      pausedUntil > 0 ? pausedUntil - Date.now() + 1000 : 60_000
     )
   }
   // A beer can count as tasted through the Untappd history, which needs the
@@ -171,7 +177,7 @@ let listView: domUtils.ListView = {
   sortBy: 'none'
 }
 
-function addListControls(card: Element) {
+function addListControls(card: Element, topListOffered: boolean) {
   const list = card.closest('ul')
   if (!list) return
   const isNewList = !list.previousElementSibling?.classList.contains('bp-sort')
@@ -186,7 +192,7 @@ function addListControls(card: Element) {
       // "Dölj provade" applies to the Topp 10 shown too.
       refreshTopList(topListHooks)
     },
-    topListOffered()
+    topListOffered
       ? (current) => {
           void runTopList(current, topListHooks)
         }
@@ -200,8 +206,13 @@ function addListControls(card: Element) {
     if (isNewList) lookUpWholeList(list)
     else void handleListCard(card)
   }
-  domUtils.setTopListButtonCount(list, productUtils.getListCount())
-  checkTopList(topListHooks)
+  // Once per list: each is a walk over the page, and the 250 ms watch on the
+  // page keeps both current from here on.
+  if (isNewList) {
+    domUtils.setTopListButtonCount(list, productUtils.getListCount())
+    if (topListRunning()) domUtils.setTopListButtonBusy(true)
+    checkTopList(topListHooks)
+  }
 }
 
 // What a Topp 10 run reads and changes of the list view.

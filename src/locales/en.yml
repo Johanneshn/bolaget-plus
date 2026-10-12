@@ -26,14 +26,14 @@ sortValue: Value
 tasted: Tasted
 topList: Top 10
 topListAllTasted: You have tasted every rated product in the selection. Turn off “Hide tasted” to see them.
-topListButtonTitle: Ranks every product matching the filters by rating – not only the ones on the page
+topListButtonTitle: Ranks by rating every product matching the filters – not only the ones on the page
 topListChanged: The selection has changed since this list was made.
-topListConfirm: The selection has {count}. Fetching ratings for all of them takes about {minutes} min. Pick a store or more filters for a shorter list – or run anyway.
+topListConfirm: The selection contains {count}. Fetching ratings for all of them takes about {minutes} min. Pick a store or more filters for a shorter list – or continue anyway.
 topListDone: Top 10 is ready
 topListEmpty: None of the products in the selection has a rating on {source}.
 topListFailed: Could not fetch the products in the selection.
 topListFootRated: Ratings found for {rated} of {total}.
-topListFootSkipped: Products in box, can or other packaging than a bottle ({count}) are left out – Vivino only rates bottles.
+topListFootSkipped: 1 product in box, can or other packaging than a bottle is left out – Vivino only rates bottles. | {count} products in box, can or other packaging than a bottle are left out – Vivino only rates bottles.
 topListFootTasted: 1 tasted product is hidden. | {count} tasted products are hidden.
 topListFootTime: Fetched {time}.
 topListFootUncertain: No certain match for {count}.
@@ -42,17 +42,19 @@ topListLoading: Fetching the products in the selection – {done} of {total}
 topListNoSearch: Could not read the selection. Reload the page and try again.
 topListNoneFetched: No ratings could be fetched.
 topListNothingToRank: Nothing in the selection can be ranked – Top 10 covers bottled wine, beer and cider.
-topListPaused: Right now {source} is not answering, probably because we searched too much in a short time. Bolaget+ holds off new searches there until {time}.
+topListPaused: Right now {source} is not answering – probably because Bolaget+ searched too much in a short time. New searches there wait until {time}.
 topListRating: Fetching ratings – {done} of {total}
 topListRatingFailed: Fetching ratings – {done} of {total} ({failed} failed)
 topListReading: Reading the selection …
-topListRefresh: Run again
+topListRefresh: Refresh
 topListRetry: Try again
-topListRunAnyway: Run anyway
-topListRunNew: Run for the new selection
+topListRetryAt: Try again at {time}
+topListRunAnyway: Continue anyway
+topListRunNew: Make one for the new selection
 topListRunning: Fetching ratings for Top 10
 topListScope: Among {count} in your selection, by rating on {source}
-topListTooMany: The selection has {count} – too many to rank. Pick a store or more filters to bring it down to at most {max} products.
+topListSwitchedOff: Ratings for the products in the selection are switched off in Bolaget+.
+topListTooMany: The selection contains {count} – too many to rank. Pick a store or more filters to bring it down to at most {max} products.
 uncertainMatch: Could not find an exact match, you can search yourself via the link below.
 undo: Undo
 vintage: Vintage

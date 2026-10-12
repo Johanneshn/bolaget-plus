@@ -134,6 +134,8 @@ const NOT_FETCHED: RatingResponse = {
 // user is looking at goes before the hundreds a "Topp 10" run queues, or the
 // cards scrolled to during a run would sit as spinners until it ends.
 interface QueuedLookup {
+  // Answers from the cache when it can, else waits its turn's delay and asks
+  // the site.
   run: () => Promise<void>
   skip: () => void
   // Whether its turn may be skipped without a wait: cancelled, or its source
@@ -155,7 +157,6 @@ async function drainLanes() {
         next.skip()
         continue
       }
-      await new Promise((resolve) => setTimeout(resolve, LIST_FETCH_DELAY_MS))
       await next.run()
     }
   } finally {
@@ -215,20 +216,21 @@ export async function enqueueListFetch(
     productName,
     query: type
   }
-  if (bulk) {
-    // Asked without the facts, the cache answers with whatever it holds; a
-    // rating found is kept, anything less gets its chance at the facts below.
-    const known = await tryGetRating({
-      includeImage: false,
-      productId,
-      productName,
-      query: type
-    }).catch(() => null)
-    if (known?.status === RatingResultStatus.Found) {
-      return known
+  const fromCache = async () => {
+    if (bulk) {
+      // Asked without the facts, the cache answers with whatever it holds; a
+      // rating found is kept, anything less gets its chance at the facts.
+      const known = await tryGetRating({
+        includeImage: false,
+        productId,
+        productName,
+        query: type
+      }).catch(() => null)
+      if (known?.status === RatingResultStatus.Found) return known
     }
+    return await tryGetRating(request).catch(() => null)
   }
-  const cached = await tryGetRating(request).catch(() => null)
+  const cached = await fromCache()
   if (cached) {
     return cached
   }
@@ -237,6 +239,15 @@ export async function enqueueListFetch(
     const lookup: QueuedLookup = {
       run: async () => {
         signal?.removeEventListener('abort', leaveQueue)
+        // A card or a run ahead in the queue may have fetched this product
+        // meanwhile. Served without the delay — and without counting for the
+        // breaker, which a cache hit would reset as if the site had answered.
+        const meanwhile = await fromCache()
+        if (meanwhile) {
+          resolve(meanwhile)
+          return
+        }
+        await new Promise((wait) => setTimeout(wait, LIST_FETCH_DELAY_MS))
         if (lookup.skippable()) {
           resolve({ ...NOT_FETCHED })
           return
@@ -288,7 +299,13 @@ function loadBreakers() {
     for (const [source, breaker] of Object.entries(
       JSON.parse(raw) as Record<string, Breaker>
     )) {
-      if (source === 'untappd' || source === 'vivino') {
+      // Only a whole breaker: a missing number would pause for NaN — never.
+      if (
+        (source === 'untappd' || source === 'vivino') &&
+        [breaker.failures, breaker.nextPause, breaker.pausedUntil].every(
+          Number.isFinite
+        )
+      ) {
         breakers.set(source, breaker)
       }
     }
