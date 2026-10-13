@@ -249,6 +249,22 @@ const STYLES = `
     height: 48px;
     object-fit: contain;
     flex-shrink: 0;
+    cursor: zoom-in;
+    transition:
+      width 0.15s ease,
+      height 0.15s ease;
+  }
+  #${RATING_CONTAINER_ID} .bp-thumb.bp-thumb-large {
+    width: 120px;
+    height: 160px;
+    cursor: zoom-out;
+  }
+  #${RATING_CONTAINER_ID} .bp-thumb:focus-visible {
+    outline: 2px solid ${PRIMARY};
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #${RATING_CONTAINER_ID} .bp-thumb { transition: none; }
   }
   #${RATING_CONTAINER_ID} .bp-alt-thumb {
     width: 28px;
@@ -257,7 +273,6 @@ const STYLES = `
     flex-shrink: 0;
   }
   @media (hover: hover) and (pointer: fine) {
-    #${RATING_CONTAINER_ID} .bp-thumb,
     #${RATING_CONTAINER_ID} .bp-alt-thumb {
       cursor: zoom-in;
     }
@@ -461,7 +476,9 @@ export function setRating(
   ratingRow.className = 'bp-rating-row'
   ratingRow.append(stars, score)
   if (rating.imageDataUrl) {
-    ratingRow.prepend(createThumbnail(rating.imageDataUrl, 'bp-thumb'))
+    const thumb = createThumbnail(rating.imageDataUrl, 'bp-thumb')
+    makeZoomable(thumb)
+    ratingRow.prepend(thumb)
   }
 
   const meta = document.createElement('div')
@@ -813,6 +830,8 @@ function attachZoomOnHover(img: HTMLImageElement, dataUrl: string): void {
     return
   }
   img.addEventListener('mouseenter', () => {
+    // Already shown large in place.
+    if (img.classList.contains('bp-thumb-large')) return
     const preview = getZoomPreview()
     preview.src = dataUrl
     positionZoomPreview(preview, img)
@@ -884,6 +903,30 @@ function hideZoomPreview(): void {
   if (zoomPreview) {
     zoomPreview.style.display = 'none'
   }
+}
+
+// A click (or tap, or Enter) enlarges the label in place, and another shrinks
+// it again. The hover preview is desktop-only and gone the moment the pointer
+// moves; this one stays put to be read, and works on a phone too.
+function makeZoomable(img: HTMLImageElement): void {
+  img.tabIndex = 0
+  img.setAttribute('role', 'button')
+  const update = (large: boolean) => {
+    img.classList.toggle('bp-thumb-large', large)
+    img.setAttribute('aria-expanded', String(large))
+    img.setAttribute('aria-label', t(large ? 'shrinkLabel' : 'enlargeLabel'))
+    img.title = t(large ? 'shrinkLabel' : 'enlargeLabel')
+  }
+  update(false)
+  const toggle = (event: Event) => {
+    event.preventDefault()
+    hideZoomPreview()
+    update(!img.classList.contains('bp-thumb-large'))
+  }
+  img.addEventListener('click', toggle)
+  img.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') toggle(event)
+  })
 }
 
 function positionZoomPreview(
