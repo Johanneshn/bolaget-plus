@@ -83,11 +83,16 @@ async function fetchFromSource(
     )
   }
 
-  const config = await browser.runtime.sendMessage<
-    SearchConfigRequest,
-    UntappdSearchConfig
-  >({ type: 'untappdSearchConfig' })
-  return await fetchRatingFromUntappd(ratingRequest.productName, config)
+  const askForConfig = (refresh: boolean) =>
+    browser.runtime.sendMessage<SearchConfigRequest, UntappdSearchConfig>({
+      refresh,
+      type: 'untappdSearchConfig'
+    })
+  return await fetchRatingFromUntappd(
+    ratingRequest.productName,
+    await askForConfig(false),
+    () => askForConfig(true)
+  )
 }
 
 // Label thumbnails stay a background job even on Chrome: images.vivino.com

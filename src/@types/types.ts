@@ -78,6 +78,9 @@ export interface RatingResponse {
 // Asks the background script for Untappd's current Algolia credentials; the
 // content script cannot read untappd.com itself (no CORS there).
 export interface SearchConfigRequest {
+  // Drop the cached credentials and read untappd.com again: the cached key
+  // was just turned away.
+  refresh?: boolean
   type: 'untappdSearchConfig'
 }
 
