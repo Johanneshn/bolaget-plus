@@ -31,6 +31,7 @@ pnpm zip:chrome        # package for store submission
 pnpm test:unit         # vitest unit tests (src/**/*.test.ts) — fast, no network
 pnpm test:matching     # mocked-fetch matching regressions — fast, no network
 pnpm test:smoke        # build:chrome then the live-site + live-API projects
+pnpm test:smoke:firefox # build:firefox then the Firefox smoke spec (FIREFOX_PATH)
 pnpm test:live         # only the live Vivino/Untappd API spec
 pnpm test              # build:chrome then run every Playwright project
 pnpm test:interactive  # playwright --ui
@@ -176,6 +177,12 @@ The Playwright tests in `e2e/` are split into three projects
   was never driven, not that it passed.
 - `live-api` (`api-live.spec.ts`) — real queries against Vivino and Untappd,
   including reading Untappd's search credentials out of its live markup.
+- `firefox-smoke` (`firefox.spec.ts`) — the Firefox build in a real Firefox,
+  driven over WebDriver BiDi with `puppeteer-core` (Playwright's own Firefox
+  cannot load extensions). Skipped unless `FIREFOX_PATH` points at a Firefox;
+  `pnpm test:smoke:firefox` builds and runs it. Worth running after touching
+  anything Firefox does differently (background-routed lookups, page-context
+  requests) — Chromium runs cannot see those bugs.
 
 Only `matching` belongs in CI. When adding a Playwright test, decide which
 project it lands in first: if it needs a third party to be up, it is a smoke

@@ -43,12 +43,19 @@ jobs:
       - name: Install Playwright Browsers
         run: pnpm playwright install --with-deps
       - name: Build the project
-        run: pnpm build:chrome
+        run: pnpm build:chrome && pnpm build:firefox
       # The extension is loaded into a headed Chromium (extensions do not load
       # in headless mode), hence xvfb.
       - name: Run smoke tests
         run: |
           xvfb-run pnpm playwright test --project=smoke --project=live-api
+        shell: bash
+      # The Firefox build in the runner's preinstalled Firefox (headless; see
+      # e2e/firefox.spec.ts). Skipped, like the Chromium smoke tests, while the
+      # geo-block holds.
+      - name: Run Firefox smoke tests
+        if: always()
+        run: FIREFOX_PATH="$(command -v firefox)" pnpm playwright test --project=firefox-smoke
         shell: bash
       - uses: actions/upload-artifact@v6
         if: always()

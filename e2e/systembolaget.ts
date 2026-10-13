@@ -48,6 +48,16 @@ export async function dismissGates(page: Page): Promise<void> {
   }
 }
 
+// The geo-block page a request landed on, or null when it reached the site.
+// Shared with the Firefox smoke tests, which drive another browser API.
+export function geoBlockedLanding(url: string): null | string {
+  const landed = new URL(url)
+  const blocked =
+    landed.hostname.endsWith('.azurefd.net') ||
+    landed.pathname.includes('blocked')
+  return blocked ? landed.href : null
+}
+
 /**
  * Opens a Systembolaget page with the interstitials cleared.
  *
@@ -85,18 +95,15 @@ export async function openPage(page: Page, url: string): Promise<void> {
  * ran on.
  */
 export function skipIfGeoBlocked(page: Page, requested: string): void {
-  const landed = new URL(page.url())
-  const blocked =
-    landed.hostname.endsWith('.azurefd.net') ||
-    landed.pathname.includes('blocked')
-  if (!blocked) return
+  const landed = geoBlockedLanding(page.url())
+  if (landed === null) return
 
   test
     .info()
     .skip(
       true,
       `Systembolaget redirected ${requested} to its geo-block page ` +
-        `(${landed.href}). The site is refusing this runner's region — ` +
+        `(${landed}). The site is refusing this runner's region — ` +
         `usually a US-hosted CI runner — so the smoke tests cannot run from ` +
         `here. This says nothing about the extension; run them from a ` +
         `non-US network.`

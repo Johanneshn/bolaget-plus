@@ -32,6 +32,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] }
     },
     {
+      // The Firefox build in a real Firefox (see firefox.spec.ts); skipped
+      // without FIREFOX_PATH.
+      name: 'firefox-smoke',
+      testMatch: /firefox\.spec\.ts/,
+      timeout: 120_000,
+      use: {}
+    },
+    {
       name: 'live-api',
       testMatch: /api-live\.spec\.ts/,
       use: {}
