@@ -181,10 +181,11 @@ describe('setRating', () => {
 
     const thumb = document.querySelector<HTMLImageElement>('.bp-thumb')
     if (!thumb) throw new Error('no thumbnail')
-    expect(thumb.getAttribute('aria-expanded')).toBe('false')
+    expect(thumb.getAttribute('aria-pressed')).toBe('false')
     thumb.click()
     expect(thumb.classList.contains('bp-thumb-large')).toBe(true)
-    expect(thumb.getAttribute('aria-label')).toBe('Förminska etiketten')
+    expect(thumb.getAttribute('aria-pressed')).toBe('true')
+    expect(thumb.title).toBe('Förminska etiketten')
     thumb.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
     expect(thumb.classList.contains('bp-thumb-large')).toBe(false)
   })
