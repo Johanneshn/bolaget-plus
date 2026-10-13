@@ -3,6 +3,7 @@ brewery: Brewery
 checkedInOnUntappd: Checked in on Untappd
 choose: Choose
 closestMatches: Closest matches
+enlargeLabel: Enlarge the label
 hideTasted: Hide tasted
 linkToUntappd: Link to Untappd
 linkToVivino: Link to Vivino
@@ -15,6 +16,7 @@ of: of
 rating: Rating
 searchAtUntappd: Search at Untappd
 searchAtVivino: Search at Vivino
+shrinkLabel: Shrink the label
 sort: Sort
 sortRating: Rating
 sortValue: Value

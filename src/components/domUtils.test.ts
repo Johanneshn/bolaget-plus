@@ -169,6 +169,25 @@ describe('setRating', () => {
 
     expect(document.querySelector('.bp-vintage')).toBeNull()
   })
+
+  it('enlarges the label on a click, and shrinks it on the next', () => {
+    renderProductPage()
+    setRating(
+      ProductType.Wine,
+      { ...rating, imageDataUrl: 'data:image/png;base64,AA==' },
+      rating.link,
+      null
+    )
+
+    const thumb = document.querySelector<HTMLImageElement>('.bp-thumb')
+    if (!thumb) throw new Error('no thumbnail')
+    expect(thumb.getAttribute('aria-expanded')).toBe('false')
+    thumb.click()
+    expect(thumb.classList.contains('bp-thumb-large')).toBe(true)
+    expect(thumb.getAttribute('aria-label')).toBe('Förminska etiketten')
+    thumb.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+    expect(thumb.classList.contains('bp-thumb-large')).toBe(false)
+  })
 })
 
 describe('correcting a match', () => {

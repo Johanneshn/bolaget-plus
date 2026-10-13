@@ -3,6 +3,7 @@ brewery: Bryggeri
 checkedInOnUntappd: Incheckad på Untappd
 choose: Välj
 closestMatches: Närmaste träffar
+enlargeLabel: Förstora etiketten
 hideTasted: Dölj provade
 linkToUntappd: Länk till Untappd
 linkToVivino: Länk till Vivino
@@ -15,6 +16,7 @@ of: av
 rating: Betyg
 searchAtUntappd: Sök hos Untappd
 searchAtVivino: Sök hos Vivino
+shrinkLabel: Förminska etiketten
 sort: Sortera
 sortRating: Betyg
 sortValue: Prisvärt
