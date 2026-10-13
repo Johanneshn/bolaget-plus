@@ -23,7 +23,7 @@ const UNTAPPD_SEARCH_CONFIG_MARKER = 'window.UNTAPPD_SEARCH_CONFIG'
 
 // Used only when that read fails (offline, markup change). Values as shipped
 // by untappd.com; stale ones surface as an Uncertain card, never a wrong one.
-const UNTAPPD_FALLBACK_CONFIG: UntappdSearchConfig = {
+export const UNTAPPD_FALLBACK_CONFIG: UntappdSearchConfig = {
   appId: '9WBO4RQ3HO',
   searchKey: '1d347324d67ec472bb7132c66aead485'
 }
@@ -525,8 +525,6 @@ export async function readUntappdSearchConfig(): Promise<null | UntappdSearchCon
     return null
   }
 }
-
-export { UNTAPPD_FALLBACK_CONFIG }
 
 // The best candidate Systembolaget's own producer vouches for, if any.
 // Consulted before the title-based rules: naming the producer is harder

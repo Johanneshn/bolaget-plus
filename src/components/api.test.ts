@@ -781,6 +781,25 @@ describe('a rejected Untappd key', () => {
     expect(fetchMock.mock.calls[1][0] as string).toContain('fresh-key')
   })
 
+  // A fresh key that is turned away too ends it there: one refresh, one
+  // retry, and a transient result — never a loop.
+  it('gives up after one retry when the fresh key is rejected too', async () => {
+    fetchMock.mockResolvedValue(new Response('', { status: 403 }))
+    const refresh = vi.fn(() =>
+      Promise.resolve({ appId: searchConfig.appId, searchKey: 'fresh-key' })
+    )
+
+    const result = await fetchRatingFromUntappd(
+      'Pabst Blue Ribbon',
+      searchConfig,
+      refresh
+    )
+
+    expect(refresh).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(result.transient).toBe(true)
+  })
+
   // The read may return the same key (Untappd's page is behind, or the 403
   // was something else); asking again with it would only fail again.
   it('is not retried when the fresh read returns the same key', async () => {
