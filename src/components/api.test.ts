@@ -750,6 +750,53 @@ describe('fetchRatingFromUntappd', () => {
   })
 })
 
+describe('a rejected Untappd key', () => {
+  const beer = {
+    beer_name: 'Pabst Blue Ribbon',
+    beer_slug: 'pabst-brewing-company-pabst-blue-ribbon',
+    bid: 3092,
+    brewery_beer_name: 'Pabst Brewing Company Pabst Blue Ribbon',
+    brewery_name: 'Pabst Brewing Company',
+    rating_count: 500000,
+    rating_score: 2.9
+  }
+
+  // A rotated key used to stay cached for a week, every beer lookup failing
+  // with it; now the first 403 fetches the current one and searches again.
+  it('is replaced by a fresh read and the search made again', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('', { status: 403 }))
+      .mockResolvedValueOnce(jsonResponse({ hits: [beer] }))
+    const fresh = { appId: searchConfig.appId, searchKey: 'fresh-key' }
+    const refresh = vi.fn(() => Promise.resolve(fresh))
+
+    const result = await fetchRatingFromUntappd(
+      'Pabst Blue Ribbon',
+      searchConfig,
+      refresh
+    )
+
+    expect(refresh).toHaveBeenCalledOnce()
+    expect(result.status).toBe(RatingResultStatus.Found)
+    expect(fetchMock.mock.calls[1][0] as string).toContain('fresh-key')
+  })
+
+  // The read may return the same key (Untappd's page is behind, or the 403
+  // was something else); asking again with it would only fail again.
+  it('is not retried when the fresh read returns the same key', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 403 }))
+
+    const result = await fetchRatingFromUntappd(
+      'Pabst Blue Ribbon',
+      searchConfig,
+      () => Promise.resolve(searchConfig)
+    )
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(result.transient).toBe(true)
+  })
+})
+
 describe('fetchUntappdSearchConfig', () => {
   // Untappd ships the credentials its own search JS uses in a JSON blob on
   // the search page. Reading them at runtime is what lets a rotated key heal

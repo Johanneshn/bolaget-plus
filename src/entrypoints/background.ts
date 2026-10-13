@@ -12,7 +12,10 @@ import {
   fetchRatingFromVivino
 } from '@/components/api'
 import { removeExpiredRatings } from '@/components/ratingsCache'
-import { getSearchConfig } from '@/components/searchConfigCache'
+import {
+  getSearchConfig,
+  refreshSearchConfig
+} from '@/components/searchConfigCache'
 
 export default defineBackground(() => {
   // The MV3 service worker starts on browser launch and on events, so this
@@ -57,7 +60,9 @@ browser.runtime.onMessage.addListener(async (message: unknown) => {
   // below. Firefox blocks content-script requests to hosts outside
   // `permissions`, so that build routes the whole lookup through here instead.
   if (isSearchConfigMessage(message)) {
-    return await getSearchConfig()
+    return message.refresh
+      ? await refreshSearchConfig()
+      : await getSearchConfig()
   }
   if (isImageMessage(message)) {
     return await fetchImageAsDataUrl(message.url)
@@ -69,7 +74,11 @@ browser.runtime.onMessage.addListener(async (message: unknown) => {
   switch (query) {
     case ProductType.Beer:
     case ProductType.Cider:
-      return await fetchRatingFromUntappd(productName, await getSearchConfig())
+      return await fetchRatingFromUntappd(
+        productName,
+        await getSearchConfig(),
+        refreshSearchConfig
+      )
     case ProductType.Wine:
       return await fetchRatingFromVivino(productName, includeImage ?? true, {
         country,

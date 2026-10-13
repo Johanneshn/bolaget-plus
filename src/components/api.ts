@@ -210,7 +210,11 @@ export async function fetchImageAsDataUrl(
 // from the Chrome manifest and users are never asked to approve it.
 export async function fetchRatingFromUntappd(
   productName: string,
-  config: UntappdSearchConfig
+  config: UntappdSearchConfig,
+  // Asked for fresh credentials when Algolia turns these away (401/403): the
+  // cached ones may have been rotated out. The search is then made once more
+  // with what it returns.
+  refreshConfig?: () => Promise<UntappdSearchConfig>
 ): Promise<RatingResponse> {
   // Credentials go in the query string with a text/plain body to keep the
   // request CORS-"simple": no preflight, so a lookup costs one round trip.
@@ -252,6 +256,15 @@ export async function fetchRatingFromUntappd(
       signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS)
     })
 
+    if ((response.status === 401 || response.status === 403) && refreshConfig) {
+      const fresh = await refreshConfig()
+      if (
+        fresh.searchKey !== config.searchKey ||
+        fresh.appId !== config.appId
+      ) {
+        return await fetchRatingFromUntappd(productName, fresh)
+      }
+    }
     if (!response.ok) {
       return uncertainFallback
     }
@@ -491,6 +504,13 @@ export async function fetchRatingFromVivino(
 // background script: untappd.com sends no CORS headers, so only the extension
 // (which declares untappd.com) can fetch it.
 export async function fetchUntappdSearchConfig(): Promise<UntappdSearchConfig> {
+  return (await readUntappdSearchConfig()) ?? UNTAPPD_FALLBACK_CONFIG
+}
+
+// The credentials as untappd.com ships them now, or null when they could not
+// be read (offline, a markup change). Telling the two apart is what lets the
+// cache hold a read for a week but a fallback for an hour only.
+export async function readUntappdSearchConfig(): Promise<null | UntappdSearchConfig> {
   try {
     // Awaited by every beer lookup on a cold start; a hang would stall the
     // list queue as a hung search would.
@@ -498,13 +518,15 @@ export async function fetchUntappdSearchConfig(): Promise<UntappdSearchConfig> {
       signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS)
     })
     if (!response.ok) {
-      return UNTAPPD_FALLBACK_CONFIG
+      return null
     }
-    return parseSearchConfig(await response.text()) ?? UNTAPPD_FALLBACK_CONFIG
+    return parseSearchConfig(await response.text())
   } catch {
-    return UNTAPPD_FALLBACK_CONFIG
+    return null
   }
 }
+
+export { UNTAPPD_FALLBACK_CONFIG }
 
 // The best candidate Systembolaget's own producer vouches for, if any.
 // Consulted before the title-based rules: naming the producer is harder
