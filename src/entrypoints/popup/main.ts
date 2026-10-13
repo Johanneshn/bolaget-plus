@@ -217,7 +217,11 @@ async function setupToggles(): Promise<void> {
 
 async function shareExtension(): Promise<void> {
   const status = document.getElementById('shareStatus')
-  const extensionUrl = 'https://addons.mozilla.org/firefox/addon/bolaget-plus/'
+  // Each browser's own store: a Chrome user sharing the extension used to
+  // hand out the Firefox add-on page.
+  const extensionUrl = import.meta.env.FIREFOX
+    ? 'https://addons.mozilla.org/firefox/addon/bolaget-plus/'
+    : 'https://chromewebstore.google.com/detail/bolaget-plus/bbjfkhmnofhindccdlfmhkibfafiogao'
   try {
     await navigator.clipboard.writeText(extensionUrl)
     if (status) status.textContent = 'Länken är kopierad'
