@@ -292,6 +292,16 @@ const STYLES = `
   @keyframes bp-spin {
     to { transform: rotate(360deg); }
   }
+  .bp-card-search {
+    position: relative;
+    z-index: 1;
+    display: inline-block;
+    margin-top: 4px;
+    color: ${MUTED_FG};
+    font-size: 12px;
+    text-decoration: underline;
+  }
+  .bp-card-search:hover { color: ${FG}; }
   .bp-card-rating {
     display: flex;
     align-items: center;
@@ -906,7 +916,8 @@ const CARD_RATING_CLASS = 'bp-card-rating'
 // re-render a tile for another product (a new sort or filter) and keep the old
 // tile element, with our badge still in it.
 const CARD_PRODUCT_ATTRIBUTE = 'data-bp-product'
-const CARD_INJECTED_SELECTOR = `.${CARD_RATING_CLASS}, .bp-card-spinner-inline`
+const CARD_SEARCH_CLASS = 'bp-card-search'
+const CARD_INJECTED_SELECTOR = `.${CARD_RATING_CLASS}, .${CARD_SEARCH_CLASS}, .bp-card-spinner-inline`
 
 // "rating": best first. "value": most rating for the money first — see
 // valueScores.
@@ -1113,6 +1124,10 @@ export function replaceCardSpinner(
   rating: RatingResponse
 ): void {
   spinner.remove()
+  if (rating.status === RatingResultStatus.Uncertain && !rating.transient) {
+    insertCardSearch(card, productId, productType, rating.link)
+    return
+  }
   if (rating.status !== RatingResultStatus.Found) {
     return
   }
@@ -1279,4 +1294,34 @@ function generateStarsSvg(rating: number): string {
   }
 
   return `<div style="display: flex">${starsHtml}</div>`
+}
+
+// No match certain enough to show a rating for: rather than leave the card
+// bare — as if Bolaget+ had not looked — hand over the search the product page
+// offers too. Not for a lookup that failed (rate limit, network): it is
+// retried, and a search link would read as "not found".
+function insertCardSearch(
+  card: Element,
+  productId: string,
+  productType: ProductType,
+  searchUrl: null | string
+): void {
+  if (!searchUrl) return
+  if (card.querySelector(CARD_INJECTED_SELECTOR)) return
+  if (getCardProductId(card) !== productId) return
+  const link = document.createElement('a')
+  link.className = CARD_SEARCH_CLASS
+  link.setAttribute(CARD_PRODUCT_ATTRIBUTE, productId)
+  link.href = searchUrl
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+  link.title = t('uncertainMatch')
+  link.textContent = t(
+    productType === ProductType.Wine ? 'searchAtVivino' : 'searchAtUntappd'
+  )
+  // The tile is one big link to the product page; this one goes elsewhere.
+  link.addEventListener('click', (event) => {
+    event.stopPropagation()
+  })
+  findCardAnchor(card)?.insertAdjacentElement('afterend', link)
 }
