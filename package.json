@@ -22,6 +22,7 @@
     "test:interactive": "playwright test --ui",
     "test:matching": "playwright test --project=matching",
     "test:smoke": "pnpm build:chrome && playwright test --project=smoke --project=live-api",
+    "test:smoke:firefox": "pnpm build:firefox && playwright test --project=firefox-smoke",
     "test:live": "playwright test --project=live-api",
     "test:unit": "vitest run"
   },
@@ -36,6 +37,7 @@
     "happy-dom": "^20.11.1",
     "playwright": "^1.61.0",
     "prettier": "^3.8.4",
+    "puppeteer-core": "^24.43.1",
     "simple-git-hooks": "^2.13.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.61.1",
