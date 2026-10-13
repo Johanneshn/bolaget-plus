@@ -255,8 +255,8 @@ const STYLES = `
       height 0.15s ease;
   }
   #${RATING_CONTAINER_ID} .bp-thumb.bp-thumb-large {
-    width: 120px;
-    height: 160px;
+    width: 220px;
+    height: 260px;
     cursor: zoom-out;
   }
   #${RATING_CONTAINER_ID} .bp-thumb:focus-visible {
@@ -307,9 +307,11 @@ const STYLES = `
   @keyframes bp-spin {
     to { transform: rotate(360deg); }
   }
+  /* The tile's title link is stretched over the whole tile by an ::after
+     overlay at z-index 1; this link sits above it to be clickable. */
   .bp-card-search {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     display: inline-block;
     margin-top: 4px;
     color: ${MUTED_FG};
@@ -911,10 +913,12 @@ function hideZoomPreview(): void {
 function makeZoomable(img: HTMLImageElement): void {
   img.tabIndex = 0
   img.setAttribute('role', 'button')
+  // A toggle: the label says what it is, aria-pressed whether it is on — so
+  // a screen reader says the state once, not in both.
+  img.setAttribute('aria-label', t('enlargeLabel'))
   const update = (large: boolean) => {
     img.classList.toggle('bp-thumb-large', large)
-    img.setAttribute('aria-expanded', String(large))
-    img.setAttribute('aria-label', t(large ? 'shrinkLabel' : 'enlargeLabel'))
+    img.setAttribute('aria-pressed', String(large))
     img.title = t(large ? 'shrinkLabel' : 'enlargeLabel')
   }
   update(false)
@@ -925,6 +929,8 @@ function makeZoomable(img: HTMLImageElement): void {
   }
   img.addEventListener('click', toggle)
   img.addEventListener('keydown', (event) => {
+    // A held key would flick it back and forth.
+    if (event.repeat) return
     if (event.key === 'Enter' || event.key === ' ') toggle(event)
   })
 }
@@ -1362,9 +1368,5 @@ function insertCardSearch(
   link.textContent = t(
     productType === ProductType.Wine ? 'searchAtVivino' : 'searchAtUntappd'
   )
-  // The tile is one big link to the product page; this one goes elsewhere.
-  link.addEventListener('click', (event) => {
-    event.stopPropagation()
-  })
   findCardAnchor(card)?.insertAdjacentElement('afterend', link)
 }
