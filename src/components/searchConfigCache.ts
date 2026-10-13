@@ -43,16 +43,37 @@ export async function getSearchConfig(): Promise<UntappdSearchConfig> {
 
 // Called when a lookup comes back unauthorized, so the search is retried with
 // what untappd.com ships now instead of a key that has since been rotated out.
+// A read from the last few minutes is as current as a new one: if the search
+// still turns that key away, it was not rotated (untappd.com down, or the
+// rejection is about something else), and reading the page again on every
+// beer lookup would only add a request to each. Lookups rejected at the same
+// time share one read.
 export async function refreshSearchConfig(): Promise<UntappdSearchConfig> {
-  await invalidateSearchConfig()
-  return await getSearchConfig()
+  const recent = await tryGetSearchConfig(REFRESH_AFTER_DAYS)
+  if (recent) return recent
+  refreshing ??= (async () => {
+    try {
+      await invalidateSearchConfig()
+      return await getSearchConfig()
+    } finally {
+      refreshing = null
+    }
+  })()
+  return await refreshing
 }
+
+const REFRESH_AFTER_DAYS = 10 / (24 * 60)
+let refreshing: null | Promise<UntappdSearchConfig> = null
 
 async function invalidateSearchConfig(): Promise<void> {
   await storage.removeItem(CACHE_KEY, { removeMeta: true })
 }
 
-async function tryGetSearchConfig(): Promise<null | UntappdSearchConfig> {
+// The cached credentials, or null when there are none or they are past their
+// age — the entry's own, or `maxAgeDays` when that is shorter.
+async function tryGetSearchConfig(
+  maxAgeDays = Infinity
+): Promise<null | UntappdSearchConfig> {
   const [config, metadata] = await Promise.all([
     storage.getItem<UntappdSearchConfig>(CACHE_KEY),
     storage.getMeta<SearchConfigMeta>(CACHE_KEY)
@@ -70,6 +91,7 @@ async function tryGetSearchConfig(): Promise<null | UntappdSearchConfig> {
     await invalidateSearchConfig()
     return null
   }
+  if (ageDays > maxAgeDays) return null
 
   return config
 }

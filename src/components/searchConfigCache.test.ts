@@ -24,15 +24,43 @@ describe('the cached Untappd credentials', () => {
   })
 
   it('are read again on a refresh', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-13T12:00:00Z'))
     const read = vi
       .spyOn(api, 'readUntappdSearchConfig')
       .mockResolvedValueOnce(live)
       .mockResolvedValueOnce({ ...live, searchKey: 'rotated' })
 
     await getSearchConfig()
+    vi.setSystemTime(new Date('2026-10-13T12:30:00Z'))
     await expect(refreshSearchConfig()).resolves.toMatchObject({
       searchKey: 'rotated'
     })
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
+  // A key still turned away minutes after it was read was not rotated;
+  // reading the page again for every beer lookup would only double them.
+  it('are not read again on a refresh minutes after the last read', async () => {
+    const read = vi
+      .spyOn(api, 'readUntappdSearchConfig')
+      .mockResolvedValue(live)
+
+    await getSearchConfig()
+    await Promise.all([refreshSearchConfig(), refreshSearchConfig()])
+    expect(read).toHaveBeenCalledOnce()
+  })
+
+  it('are read once for refreshes made at the same time', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-13T12:00:00Z'))
+    const read = vi
+      .spyOn(api, 'readUntappdSearchConfig')
+      .mockResolvedValue(live)
+    await getSearchConfig()
+    vi.setSystemTime(new Date('2026-10-13T13:00:00Z'))
+
+    await Promise.all([refreshSearchConfig(), refreshSearchConfig()])
     expect(read).toHaveBeenCalledTimes(2)
   })
 
