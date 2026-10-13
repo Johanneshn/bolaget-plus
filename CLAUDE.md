@@ -159,7 +159,7 @@ network and are the first thing to extend when touching matching rules. Tests
 that need a DOM opt in per file with a `// @vitest-environment happy-dom`
 docblock; the default environment stays `node`.
 
-The Playwright tests in `e2e/` are split into three projects
+The Playwright tests in `e2e/` are split into four projects
 (`playwright.config.ts`), divided by whether they touch the network:
 
 - `matching` (`api-matching.spec.ts`) — mocked-`fetch` regression tests for the
