@@ -17,13 +17,15 @@ export default defineConfig({
       }
     },
     content_security_policy: {
-      extension_pages: `script-src 'self'; object-src 'self'; connect-src 'self' https://www.vivino.com https://images.vivino.com https://thumbs.vivino.com https://untappd.com${browser === 'firefox' ? ' https://*.algolia.net' : ''}${isProduction ? '' : ' ws://localhost:3000/'};`
+      extension_pages: `script-src 'self'; object-src 'self'; connect-src 'self' https://images.vivino.com https://thumbs.vivino.com https://untappd.com${browser === 'firefox' ? ' https://*.algolia.net' : ''}${isProduction ? '' : ' ws://localhost:3000/'};`
     },
     default_locale: 'sv',
+    // The stores show these as the listing's name and summary (the Chrome Web
+    // Store takes its summary from nowhere else), in the visitor's language.
+    description: '__MSG_extDescription__',
 
     host_permissions: [
       'https://www.systembolaget.se/*',
-      'https://www.vivino.com/*',
       // Vivino serves label/bottle thumbnails from separate image hosts
       'https://images.vivino.com/*',
       'https://thumbs.vivino.com/*',
@@ -44,10 +46,10 @@ export default defineConfig({
       48: 'icons/48.png',
       128: 'icons/128.png'
     },
+    name: '__MSG_extName__',
     permissions: [
       'storage',
-      '*://*.vivino.com/*',
-      '*://*.untappd.com/*',
+      // The popup's share button copies the store link.
       'clipboardWrite',
       // Conditionally include permissions based on the build environment
       ...(isProduction ? [] : ['ws://localhost:3000/'])

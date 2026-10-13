@@ -18,7 +18,7 @@
     "ft:check": "prettier --check \"{src,e2e}/**/*.{js,jsx,ts,tsx,json,css,scss,md}\" \"*.config.ts\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "pnpm build:chrome && playwright test",
+    "test": "pnpm build:chrome && pnpm build:firefox && playwright test",
     "test:interactive": "playwright test --ui",
     "test:matching": "playwright test --project=matching",
     "test:smoke": "pnpm build:chrome && playwright test --project=smoke --project=live-api",
