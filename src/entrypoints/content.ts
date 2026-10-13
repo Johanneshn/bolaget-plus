@@ -13,7 +13,11 @@ import {
   unpinMatch
 } from '@/components/pinnedMatches'
 import * as productUtils from '@/components/productUtils'
-import { enqueueListFetch, fetchRating } from '@/components/ratingService'
+import {
+  enqueueListFetch,
+  fetchRating,
+  sourcePausedUntil
+} from '@/components/ratingService'
 import {
   beerFeatureEnabled,
   ciderFeatureEnabled,
@@ -105,12 +109,24 @@ async function handleListCard(card: Element) {
     producer: productUtils.getProducer(productId) ?? undefined
   })
   domUtils.replaceCardSpinner(card, spinner, productId, productType, rating)
+  // Not answered (rate limit, network, a paused site): try again later rather
+  // than leave the card bare for the rest of the visit.
+  if (rating.transient) scheduleCardRetry(card, productType)
   // A beer can count as tasted through the Untappd history, which needs the
   // matched beer's link.
   await markCardTasted(card, productId, rating.link)
   const list = card.closest('ul')
   if (list) domUtils.applyListView(list, listView)
 }
+
+// One pending retry per card: each re-sort or "Dölj provade" looks the card
+// up again, and every failed lookup scheduling its own retry would multiply
+// them. Once the site's pause is over, or in a minute when it is not paused;
+// a failure that is not a pause (one product's lookup erring while the site
+// answers others) is retried a few times only. A site that keeps failing is
+// paused by the breaker, which bounds what these retries can send.
+const cardRetries = new WeakMap<Element, number>()
+const MAX_CARD_RETRIES = 3
 
 async function markCardTasted(
   card: Element,
@@ -123,6 +139,22 @@ async function markCardTasted(
   domUtils.markCardTasted(card, source !== null)
   const list = card.closest('ul')
   if (list && listView.hideTasted) domUtils.applyListView(list, listView)
+}
+
+function scheduleCardRetry(card: Element, productType: ProductType) {
+  const retries = cardRetries.get(card) ?? 0
+  // Negative while a retry is pending.
+  if (retries < 0) return
+  const pausedUntil = sourcePausedUntil(productType)
+  if (pausedUntil === 0 && retries >= MAX_CARD_RETRIES) return
+  cardRetries.set(card, -(retries + 1))
+  setTimeout(
+    () => {
+      cardRetries.set(card, retries + 1)
+      if (card.isConnected) void handleListCard(card)
+    },
+    pausedUntil > 0 ? pausedUntil - Date.now() + 1000 : 60_000
+  )
 }
 
 // The "Provad" toggle on a product page. Re-rendered after the rating

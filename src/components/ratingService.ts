@@ -119,7 +119,42 @@ function isMissingImages(rating: RatingResponse, type: ProductType): boolean {
 
 const LIST_FETCH_DELAY_MS = 300
 
+// What a lookup held back while its site is paused answers. Transient, so
+// nothing caches it.
+const NOT_FETCHED: RatingResponse = {
+  link: null,
+  name: null,
+  rating: 0,
+  status: RatingResultStatus.NotFound,
+  transient: true,
+  votes: 0
+}
+
 let listFetchQueue: Promise<undefined> = Promise.resolve(undefined)
+
+// A circuit breaker per rating site. Vivino and Untappd answer a burst of
+// queries with 429s, and a ban outlasts the burst: going on at the queue's
+// pace would only renew it — for the cards too, which share the key and the
+// IP. (A product page's single lookup goes around the queue and the breaker:
+// the user asked for that one wine.) So after BREAKER_FAILURES transient failures in a row
+// the site is left alone for a while, doubling each time it is still failing,
+// and the first lookup after the pause decides whether it is over.
+const BREAKER_FAILURES = 5
+const BREAKER_FIRST_PAUSE_MS = 60_000
+const BREAKER_MAX_PAUSE_MS = 10 * 60_000
+interface Breaker {
+  failures: number
+  nextPause: number
+  pausedUntil: number
+  // Paused at least once since the last success: the next failure pauses it
+  // again at once.
+  tripped: boolean
+}
+const breakers = new Map<'untappd' | 'vivino', Breaker>()
+// Kept for the tab, not just the page: product links are full page loads, and
+// each load would otherwise grant a banned site five fresh queries.
+const BREAKERS_KEY = 'bolaget-plus:breakers'
+let breakersLoaded = false
 
 export async function enqueueListFetch(
   productId: string,
@@ -134,27 +169,109 @@ export async function enqueueListFetch(
   if (pinned) {
     return pinned
   }
-  const cached = await tryGetRating({
+  const request = {
     ...facts,
     includeImage: false,
     productId,
     productName,
     query: type
-  }).catch(() => null)
+  }
+  const cached = await tryGetRating(request).catch(() => null)
   if (cached) {
     return cached
   }
 
-  const task = listFetchQueue.then(
-    () =>
-      new Promise<RatingResponse>((resolve) => {
-        setTimeout(() => {
-          void fetchRating(productId, productName, type, false, facts).then(
-            resolve
-          )
-        }, LIST_FETCH_DELAY_MS)
-      })
-  )
+  const task = listFetchQueue.then(async (): Promise<RatingResponse> => {
+    // Held back without the wait while the site is paused.
+    if (sourcePausedUntil(type) > 0) return { ...NOT_FETCHED }
+    await new Promise((wait) => setTimeout(wait, LIST_FETCH_DELAY_MS))
+    if (sourcePausedUntil(type) > 0) return { ...NOT_FETCHED }
+    // A card ahead in the queue may have fetched this product meanwhile (the
+    // same wine in two sizes, a re-sort). Served from the cache, and not
+    // counted for the breaker, which a cache hit would reset as if the site
+    // had answered.
+    const meanwhile = await tryGetRating(request).catch(() => null)
+    if (meanwhile) return meanwhile
+    const rating = await fetchRating(productId, productName, type, false, facts)
+    recordLookup(type, rating)
+    return rating
+  })
   listFetchQueue = task.then(() => undefined)
   return task
+}
+
+// When the site rating products of this type may be asked again, as a
+// timestamp; 0 when it is not paused.
+export function sourcePausedUntil(type: ProductType): number {
+  loadBreakers()
+  const breaker = breakers.get(sourceOf(type))
+  return breaker && breaker.pausedUntil > Date.now() ? breaker.pausedUntil : 0
+}
+
+function loadBreakers() {
+  if (breakersLoaded) return
+  breakersLoaded = true
+  try {
+    const raw = sessionStorage.getItem(BREAKERS_KEY)
+    if (!raw) return
+    for (const [source, breaker] of Object.entries(
+      JSON.parse(raw) as Record<string, Breaker>
+    )) {
+      // Only a whole breaker: a missing number would pause for NaN — never.
+      if (
+        (source === 'untappd' || source === 'vivino') &&
+        [breaker.failures, breaker.nextPause, breaker.pausedUntil].every(
+          Number.isFinite
+        )
+      ) {
+        breakers.set(source, breaker)
+      }
+    }
+  } catch {
+    // Unreadable or blocked: start without a pause.
+  }
+}
+
+function recordLookup(type: ProductType, rating: RatingResponse) {
+  loadBreakers()
+  const source = sourceOf(type)
+  const breaker = breakers.get(source) ?? {
+    failures: 0,
+    nextPause: BREAKER_FIRST_PAUSE_MS,
+    pausedUntil: 0,
+    tripped: false
+  }
+  breakers.set(source, breaker)
+  if (!rating.transient) {
+    // Nothing to record unless it was failing.
+    if (breaker.failures === 0 && !breaker.tripped) return
+    breaker.failures = 0
+    breaker.nextPause = BREAKER_FIRST_PAUSE_MS
+    breaker.tripped = false
+    saveBreakers()
+    return
+  }
+  breaker.failures++
+  if (breaker.tripped || breaker.failures >= BREAKER_FAILURES) {
+    breaker.pausedUntil = Date.now() + breaker.nextPause
+    breaker.nextPause = Math.min(breaker.nextPause * 2, BREAKER_MAX_PAUSE_MS)
+    breaker.failures = 0
+    breaker.tripped = true
+  }
+  saveBreakers()
+}
+
+function saveBreakers() {
+  try {
+    sessionStorage.setItem(
+      BREAKERS_KEY,
+      JSON.stringify(Object.fromEntries(breakers))
+    )
+  } catch {
+    // Blocked: the pause holds for this page only.
+  }
+}
+
+function sourceOf(type: ProductType): 'untappd' | 'vivino' {
+  return type === ProductType.Wine ? 'vivino' : 'untappd'
 }

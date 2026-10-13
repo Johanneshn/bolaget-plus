@@ -69,7 +69,11 @@ external fetches are delegated to the background script.
    title link inside each `[data-slot="product-tile"]`) and, once a card
    scrolls into view, injects a compact rating badge via a throttled fetch
    queue (`enqueueListFetch`, one request per 300 ms — cached ratings skip
-   the queue and render immediately).
+   the queue and render immediately). A per-site circuit breaker in
+   `ratingService.ts` pauses Vivino or Untappd after five transient failures
+   in a row (rate limit, network, a search past its 10 s timeout) — a minute,
+   doubling up to ten, kept in the tab's `sessionStorage` — so a ban is not
+   renewed at the queue's pace; cards held back are retried once it is over.
 2. `productUtils.ts` derives `ProductType` from the URL path (`/produkt/vin/`,
    `/produkt/ol/`, `/produkt/cider-blanddrycker/`), extracts the product name
    from the `<h1>` (or from a card's `data-slot` parts), and gates wine on
