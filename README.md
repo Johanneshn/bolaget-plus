@@ -1,87 +1,90 @@
 # Bolaget+
 
-[![GitHub Release](https://img.shields.io/github/release/Johanneshn/bolaget-plus.svg?style=flat)]() [![CI](https://github.com/Johanneshn/bolaget-plus/actions/workflows/ci.yaml/badge.svg?branch=main&event=push)](https://github.com/Johanneshn/bolaget-plus/actions/workflows/ci.yaml)
+[![GitHub Release](https://img.shields.io/github/release/Johanneshn/bolaget-plus.svg?style=flat)](https://github.com/Johanneshn/bolaget-plus/releases) [![CI](https://github.com/Johanneshn/bolaget-plus/actions/workflows/ci.yaml/badge.svg?branch=main&event=push)](https://github.com/Johanneshn/bolaget-plus/actions/workflows/ci.yaml)
 
-A browser plugin for Systembolaget.se that shows ratings directly at systembolagets website!
+A browser extension that shows Vivino and Untappd ratings on
+[Systembolaget.se](https://www.systembolaget.se), next to the product you are
+already looking at.
 
-![screenshot](header.jpg)
+![The Bolaget+ rating card on a Systembolaget wine page](docs/screenshots/header.png)
 
-## Features
+[![Firefox Add-ons](https://img.shields.io/badge/Firefox-Add--ons-orange?logo=firefox)](https://addons.mozilla.org/firefox/addon/bolaget-plus) [![Chrome Web Store](https://img.shields.io/badge/Chrome-Web%20Store-blue?logo=google-chrome)](https://chromewebstore.google.com/detail/bolaget-plus/bbjfkhmnofhindccdlfmhkibfafiogao)
 
-- Seamless integration with Systembolaget's website
-- Wine ratings from [Vivino](https://www.vivino.com/) with direct links to product pages
-- Beer ratings from [Untappd](https://untappd.com/) with direct links to product pages
-- Cider & mixed drink ratings from [Untappd](https://untappd.com/) with direct links to product pages
-- Rating badges on product cards in the assortment list pages
-- Label thumbnails with hover zoom, and "closest match" suggestions when no confident match is found
-- Easy toggling of features through a simple popup interface
-- Works with both Firefox and Chrome browsers
+## What it does
 
-## Installation
+**On a product page** you get the rating, the number of votes and a link to
+the wine on Vivino, or the beer or cider on Untappd. For wine it also shows the
+rating of the vintage on the shelf when Vivino has one. Click the label
+thumbnail to see it larger.
 
-[![Download Firefox Extension](https://img.shields.io/badge/Download-Firefox%20Extension-orange?logo=firefox)](https://addons.mozilla.org/firefox/addon/bolaget-plus) [![Download Chrome Extension](https://img.shields.io/badge/Download-Chrome%20Extension-blue?logo=google-chrome)](https://chromewebstore.google.com/detail/bolaget-plus/bbjfkhmnofhindccdlfmhkibfafiogao)
+**In the product lists** each card gets a small rating badge. You can sort the
+cards you have loaded by rating, or by *Prisvärt* — how much better a wine is
+rated than is usual at its price.
 
-Or download the latest zip from the [Github Releases](https://github.com/Johanneshn/bolaget-plus/releases) page and install it in your browser.
+**Tasted.** Mark a product as tasted and it is marked in the lists too, where
+*Dölj provade* hides it. If you use Untappd Insider you can import your
+check-in history, and beers you have already had are marked for you. The list
+can be saved to a file and read into another browser.
 
-## Usage
+**When the match is wrong.** Names on Systembolaget and on Vivino don't always
+line up. When Bolaget+ isn't sure, it shows the closest candidates instead of
+guessing, and *Fel träff?* lets you pick the right one; your choice is
+remembered. Cards without a certain match link to a search on Vivino or
+Untappd.
 
-1. Install the extension from the Firefox Add-ons or Chrome Web Store.
-2. Navigate to the Systembolaget website.
-3. Browse products as usual. Ratings will be displayed on the product pages.
-4. Use the extension popup to:
-   - Disable wine ratings.
-   - Disable beer ratings.
-   - Disable cider & mixed drink ratings.
-   - Disable the extension entirely.
+Wine ratings come from [Vivino](https://www.vivino.com/), beer and cider ratings
+from [Untappd](https://untappd.com/). Each kind can be switched off in the
+extension's popup.
+
+| Product lists | A beer | The popup |
+|---|---|---|
+| ![Rating badges on a list of red wines, sorted by rating](docs/screenshots/list.png) | ![Untappd rating on a beer page](docs/screenshots/product-beer.png) | ![The popup with its switches](docs/screenshots/popup.png) |
+
+## Privacy
+
+Bolaget+ has no server and collects nothing. To find a rating it sends the
+product's name to Vivino's or Untappd's own search, the same search their
+websites use. Ratings, your tasted list and your corrections are stored in your
+browser. Nothing is sent to Systembolaget beyond what your browser already
+loads when you visit the site.
+
+## Install
+
+Install from [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/bolaget-plus)
+or the [Chrome Web Store](https://chromewebstore.google.com/detail/bolaget-plus/bbjfkhmnofhindccdlfmhkibfafiogao).
+Builds for both are also attached to each
+[GitHub release](https://github.com/Johanneshn/bolaget-plus/releases).
+
+Found a wrong rating or a bug? [Open an issue](https://github.com/Johanneshn/bolaget-plus/issues).
 
 ## Development
 
-Install dependencies with [pnpm](https://pnpm.io/)
+Built with [WXT](https://wxt.dev) and TypeScript. Install the dependencies with
+[pnpm](https://pnpm.io/) (this also installs the git hooks):
 
 ```sh
 pnpm install
-# Git hooks will be automatically installed
+pnpm dev:chrome    # or dev:firefox
 ```
 
-Run it in either Chrome or Firefox:
+Checks that CI runs (fast, no network):
 
 ```sh
-pnpm dev:firefox
-pnpm dev:chrome
+pnpm compile && pnpm lint && pnpm test:unit && pnpm test:matching
 ```
 
-### Testing
-
-Run the checks CI gates on (fast, no network):
+Smoke tests run the built extension against the live Systembolaget, Vivino
+and Untappd sites. They depend on those sites' markup, so they run nightly
+rather than on every push:
 
 ```sh
-pnpm test:unit       # vitest unit tests
-pnpm test:matching   # mocked-fetch Vivino/Untappd matching regressions
+pnpm test:smoke            # Chromium
+pnpm test:smoke:firefox    # Firefox; set FIREFOX_PATH
 ```
 
-Run the smoke tests (builds the extension, then drives it against the live
-Systembolaget/Vivino/Untappd sites with Playwright). These depend on those
-sites' current markup and availability, so they are expected to be flaky and
-run nightly rather than on every push:
-
-```sh
-pnpm test:smoke
-```
-
-### Building
-
-Build the extension locally:
-
-```sh
-pnpm build:chrome   # or build:firefox
-```
-
-The output is located in the `.output` folder.
+Build with `pnpm build:chrome` or `pnpm build:firefox`; the output is in
+`.output/`. [CLAUDE.md](CLAUDE.md) describes how the code fits together.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE) - see the LICENSE file for details.
-
-## Framework
-
-This extension is built using the WXT framework. Learn more about [WXT](https://wxt.dev/guide/essentials/project-structure) here.
+[MIT](LICENSE)
