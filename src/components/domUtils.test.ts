@@ -93,6 +93,38 @@ describe('replaceCardSpinner', () => {
 
     expect(card.querySelector('.bp-card-rating')).toBeNull()
   })
+
+  const settle = (card: Element, rating: Partial<RatingResponse>) => {
+    const spinner = injectCardSpinner(card, '203701')
+    if (!spinner) throw new Error('spinner not injected')
+    replaceCardSpinner(card, spinner, '203701', ProductType.Wine, {
+      link: 'https://www.vivino.com/search/wines?q=Crudo',
+      rating: 0,
+      status: RatingResultStatus.Uncertain,
+      votes: 0,
+      ...rating
+    } as RatingResponse)
+  }
+
+  // A card without a certain match used to be left bare, as if Bolaget+ had
+  // not looked at all; the product page offered a search, the card nothing.
+  it('offers a search when no match is certain', () => {
+    const card = renderCard('203701')
+    settle(card, {})
+
+    const link = card.querySelector<HTMLAnchorElement>('.bp-card-search')
+    expect(link?.textContent).toBe('Sök hos Vivino')
+    expect(link?.href).toBe('https://www.vivino.com/search/wines?q=Crudo')
+    expect(link?.target).toBe('_blank')
+  })
+
+  // A lookup that failed is retried; a search link would read as "not found".
+  it('offers no search when the lookup failed', () => {
+    const card = renderCard('203701')
+    settle(card, { transient: true })
+
+    expect(card.querySelector('.bp-card-search')).toBeNull()
+  })
 })
 
 describe('setRating', () => {
