@@ -1,9 +1,14 @@
 # Store listings
 
 Text and images for the Chrome Web Store and Firefox Add-ons (AMO), kept here
-so the listings can be updated from the same place as the code. Screenshots
-are in [`screenshots/`](screenshots/), all 1280×800 as the Chrome Web Store
-requires; AMO accepts the same files.
+so the listings can be updated from the same place as the code. Store
+screenshots are in [`screenshots/`](screenshots/) at 1280×800, as the Chrome
+Web Store requires; AMO accepts the same files. (`header.png` there is the
+README's image, not a store screenshot.)
+
+The **name** and **summary** are not set in either dashboard: both stores read
+them from the manifest, which takes them from `extName` and `extDescription`
+in `src/locales/{sv,en}.yml`. The text below is the same, for reference.
 
 Suggested screenshot order: `product-wine.png`, `list.png`, `product-beer.png`,
 `product-wine-zoom.png`, `popup.png`.
@@ -19,7 +24,7 @@ Suggested screenshot order: `product-wine.png`, `list.png`, `product-beer.png`,
 **Description**
 
 > Bolaget+ visar betyg från Vivino (vin) och Untappd (öl och cider) direkt på
-> Systembolaget.se, bredvid varan du redan tittar på.
+> Systembolaget.se: på produktsidorna och på varorna i sortimentlistorna.
 >
 > På produktsidan
 > • Betyg, antal röster och länk till vinet på Vivino eller ölet på Untappd
@@ -27,8 +32,8 @@ Suggested screenshot order: `product-wine.png`, `list.png`, `product-beer.png`,
 > • Klicka på etiketten för att se den större
 >
 > I sortimentlistorna
-> • Ett litet betyg på varje vara
-> • Sortera det du har laddat efter betyg, eller efter Prisvärt – hur mycket bättre betyg ett vin har än vad som är vanligt i dess prisklass
+> • Ett litet betyg på de viner, öl och cidrar som Bolaget+ hittar
+> • Sortera det du har laddat efter betyg, eller efter Prisvärt – hur mycket bättre betyg en vara har än vad som är vanligt i dess prisklass
 >
 > Provade
 > • Markera det du har provat, så syns det i listorna, där Dölj provade gömmer det
@@ -39,7 +44,7 @@ Suggested screenshot order: `product-wine.png`, `list.png`, `product-beer.png`,
 > Namnen på Systembolaget och Vivino stämmer inte alltid överens. När Bolaget+ är osäkert visar det de närmaste kandidaterna i stället för att gissa, och med Fel träff? väljer du rätt – valet sparas.
 >
 > Integritet
-> Bolaget+ har ingen egen server och samlar inte in något. För att hitta ett betyg skickas varans namn till Vivinos eller Untappds egen sökning. Betyg, din provade-lista och dina rättelser sparas i webbläsaren.
+> Bolaget+ har ingen egen server och samlar inte in några personuppgifter. För att hitta ett betyg skickas namnet på varan du tittar på till Vivinos eller Untappds sökning. Betyg, din provade-lista och dina rättelser sparas i webbläsaren.
 >
 > Bolaget+ är ett fristående hobbyprojekt och har ingen koppling till Systembolaget, Vivino eller Untappd. Källkoden finns på GitHub: https://github.com/Johanneshn/bolaget-plus
 
@@ -52,7 +57,7 @@ Suggested screenshot order: `product-wine.png`, `list.png`, `product-beer.png`,
 **Description**
 
 > Bolaget+ shows ratings from Vivino (wine) and Untappd (beer and cider) on
-> Systembolaget.se, next to the product you are already looking at.
+> Systembolaget.se: on product pages, and on the products in the lists.
 >
 > On a product page
 > • The rating, the number of votes and a link to the wine on Vivino or the beer on Untappd
@@ -60,8 +65,8 @@ Suggested screenshot order: `product-wine.png`, `list.png`, `product-beer.png`,
 > • Click the label to see it larger
 >
 > In the product lists
-> • A small rating on every product
-> • Sort what you have loaded by rating, or by value – how much better a wine is rated than is usual at its price
+> • A small rating on the wines, beers and ciders Bolaget+ finds
+> • Sort what you have loaded by rating, or by value – how much better a product is rated than is usual at its price
 >
 > Tasted
 > • Mark what you have tasted; it is marked in the lists too, where "Dölj provade" hides it
@@ -72,21 +77,25 @@ Suggested screenshot order: `product-wine.png`, `list.png`, `product-beer.png`,
 > Names on Systembolaget and on Vivino don't always line up. When Bolaget+ isn't sure, it shows the closest candidates instead of guessing, and "Fel träff?" lets you pick the right one; your choice is remembered.
 >
 > Privacy
-> Bolaget+ has no server and collects nothing. To find a rating it sends the product's name to Vivino's or Untappd's own search. Ratings, your tasted list and your corrections are stored in your browser.
+> Bolaget+ has no server and collects no personal data. To find a rating it sends the name of the product you are viewing to Vivino's or Untappd's search. Ratings, your tasted list and your corrections are stored in your browser.
 >
 > Bolaget+ is an independent hobby project, not affiliated with Systembolaget, Vivino or Untappd. Source code: https://github.com/Johanneshn/bolaget-plus
 
 ## Listing details
 
-- **Category:** Chrome: *Shopping* (or *Lifestyle*). AMO: *Shopping*.
-- **AMO tags:** systembolaget, vivino, untappd, wine, beer, ratings
+- **Category:** Chrome: *Shopping* (or *Lifestyle*). AMO: *Shopping* (AMO's
+  tags come from a fixed list; *shopping* is the one that fits).
 - **Support / homepage:** https://github.com/Johanneshn/bolaget-plus
 - **Chrome privacy practices** (*Privacy* tab):
   - Single purpose: *Shows Vivino and Untappd ratings for products on Systembolaget.se.*
-  - Data usage: no user data is collected or transmitted. The product name is sent to Vivino's or Untappd's search to find its rating; nothing is sent to the developer.
+  - Data usage: no personal data is collected. The names of the products the user views are sent to Vivino's and Untappd's search (hosted by Algolia) to find their ratings; nothing is sent to the developer.
   - Permission justifications:
     - `storage`: caches ratings for a day, and stores the user's settings, tasted list and match corrections.
     - `clipboardWrite`: the popup's share button copies the link to the extension's store page.
     - Host access to `systembolaget.se`: to show ratings on its pages.
-    - Host access to `vivino.com`, `images.vivino.com`, `thumbs.vivino.com`: rating links and label thumbnails (the page blocks loading Vivino's images directly).
+    - Host access to `images.vivino.com`, `thumbs.vivino.com`: label thumbnails, downloaded by the extension because the page blocks loading Vivino's images directly.
     - Host access to `untappd.com`: reads the search credentials Untappd's own search page ships, so beer lookups keep working when Untappd changes them.
+- **AMO reviewer notes:** the Firefox build also asks for `https://*.algolia.net/*`.
+  Vivino's and Untappd's searches are Algolia indexes, and Firefox only lets an
+  extension reach hosts it declares. The Chrome build needs no such permission,
+  because its content script queries Algolia as an ordinary CORS request.

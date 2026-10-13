@@ -3,8 +3,8 @@
 [![GitHub Release](https://img.shields.io/github/release/Johanneshn/bolaget-plus.svg?style=flat)](https://github.com/Johanneshn/bolaget-plus/releases) [![CI](https://github.com/Johanneshn/bolaget-plus/actions/workflows/ci.yaml/badge.svg?branch=main&event=push)](https://github.com/Johanneshn/bolaget-plus/actions/workflows/ci.yaml)
 
 A browser extension that shows Vivino and Untappd ratings on
-[Systembolaget.se](https://www.systembolaget.se), next to the product you are
-already looking at.
+[Systembolaget.se](https://www.systembolaget.se): on product pages, and on the
+cards in the product lists.
 
 ![The Bolaget+ rating card on a Systembolaget wine page](docs/screenshots/header.png)
 
@@ -17,9 +17,9 @@ the wine on Vivino, or the beer or cider on Untappd. For wine it also shows the
 rating of the vintage on the shelf when Vivino has one. Click the label
 thumbnail to see it larger.
 
-**In the product lists** each card gets a small rating badge. You can sort the
-cards you have loaded by rating, or by *Prisvärt* — how much better a wine is
-rated than is usual at its price.
+**In the product lists** the wines, beers and ciders it finds a match for get a
+small rating badge. You can sort the cards you have loaded by rating, or by
+*Prisvärt* — how much better a product is rated than is usual at its price.
 
 **Tasted.** Mark a product as tasted and it is marked in the lists too, where
 *Dölj provade* hides it. If you use Untappd Insider you can import your
@@ -42,9 +42,9 @@ extension's popup.
 
 ## Privacy
 
-Bolaget+ has no server and collects nothing. To find a rating it sends the
-product's name to Vivino's or Untappd's own search, the same search their
-websites use. Ratings, your tasted list and your corrections are stored in your
+Bolaget+ has no server and collects no personal data. To find a rating it
+sends the name of the product you are viewing to Vivino's or Untappd's search,
+the same search their own websites use. Ratings, your tasted list and your corrections are stored in your
 browser. Nothing is sent to Systembolaget beyond what your browser already
 loads when you visit the site.
 
@@ -67,10 +67,10 @@ pnpm install
 pnpm dev:chrome    # or dev:firefox
 ```
 
-Checks that CI runs (fast, no network):
+The checks CI runs (fast, no network):
 
 ```sh
-pnpm compile && pnpm lint && pnpm test:unit && pnpm test:matching
+pnpm compile && pnpm ft:check && pnpm lint && pnpm test:unit && pnpm test:matching && pnpm build:chrome
 ```
 
 Smoke tests run the built extension against the live Systembolaget, Vivino

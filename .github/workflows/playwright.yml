@@ -42,20 +42,26 @@ jobs:
         run: pnpm install
       - name: Install Playwright Browsers
         run: pnpm playwright install --with-deps
-      - name: Build the project
-        run: pnpm build:chrome && pnpm build:firefox
-      # The extension is loaded into a headed Chromium (extensions do not load
-      # in headless mode), hence xvfb.
+      - name: Build the Chrome extension
+        run: pnpm build:chrome
+      - name: Build the Firefox extension
+        run: pnpm build:firefox
+      # Without a Firefox every Firefox test would skip and the run go green
+      # having tested nothing.
+      - name: Find Firefox
+        run: echo "FIREFOX_PATH=$(command -v firefox)" >> "$GITHUB_ENV"
+        shell: bash
+      - name: Check Firefox is there
+        run: test -x "$FIREFOX_PATH"
+        shell: bash
+      # One run for every project: Playwright's HTML reporter empties its
+      # folder before writing, so a second run would delete the first one's
+      # report. The Chromium tests load the extension into a headed browser
+      # (extensions do not load in headless mode), hence xvfb; Firefox runs
+      # headless (see e2e/firefox.spec.ts).
       - name: Run smoke tests
         run: |
-          xvfb-run pnpm playwright test --project=smoke --project=live-api
-        shell: bash
-      # The Firefox build in the runner's preinstalled Firefox (headless; see
-      # e2e/firefox.spec.ts). Skipped, like the Chromium smoke tests, while the
-      # geo-block holds.
-      - name: Run Firefox smoke tests
-        if: always()
-        run: FIREFOX_PATH="$(command -v firefox)" pnpm playwright test --project=firefox-smoke
+          xvfb-run pnpm playwright test --project=smoke --project=live-api --project=firefox-smoke
         shell: bash
       - uses: actions/upload-artifact@v6
         if: always()

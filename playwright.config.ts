@@ -5,10 +5,11 @@ import { defineConfig, devices } from '@playwright/test'
 //
 //   matching            mocked fetch, no network, no browser. Deterministic,
 //                       so CI gates on it and the README badge reports it.
-//   smoke / live-api    drive the live Systembolaget site and query
-//                       Vivino/Untappd for real. Run nightly; they fail when
-//                       those sites change or are down, which is worth an
-//                       alert but is not a build status.
+//   smoke / live-api /  drive the live Systembolaget site (in Chromium, and
+//   firefox-smoke       in Firefox) and query Vivino/Untappd for real. Run
+//                       nightly; they fail when those sites change or are
+//                       down, which is worth an alert but is not a build
+//                       status.
 export default defineConfig({
   // Fail the build on CI if you accidentally left test.only in the source code.
   forbidOnly: !!process.env.CI,
