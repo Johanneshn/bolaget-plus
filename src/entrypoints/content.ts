@@ -21,6 +21,8 @@ import {
 import {
   beerFeatureEnabled,
   ciderFeatureEnabled,
+  rumFeatureEnabled,
+  whiskyFeatureEnabled,
   wineFeatureEnabled
 } from '@/components/settings'
 import { t } from '@/components/strings'
@@ -60,17 +62,20 @@ export default defineContentScript({
 let activeRequest: null | { productName: string } = null
 
 async function featureEnabled(productType: ProductType): Promise<boolean> {
-  if (
-    (productType === ProductType.Wine &&
-      !(await wineFeatureEnabled.getValue())) ||
-    (productType === ProductType.Beer &&
-      !(await beerFeatureEnabled.getValue())) ||
-    (productType === ProductType.Cider &&
-      !(await ciderFeatureEnabled.getValue()))
-  ) {
-    return false
+  switch (productType) {
+    case ProductType.Beer:
+      return await beerFeatureEnabled.getValue()
+    case ProductType.Cider:
+      return await ciderFeatureEnabled.getValue()
+    case ProductType.Rum:
+      return await rumFeatureEnabled.getValue()
+    case ProductType.Whisky:
+      return await whiskyFeatureEnabled.getValue()
+    case ProductType.Wine:
+      return await wineFeatureEnabled.getValue()
+    default:
+      return true
   }
-  return true
 }
 
 async function handleListCard(card: Element) {
@@ -102,6 +107,7 @@ async function handleListCard(card: Element) {
   if (!spinner) return
 
   const rating = await enqueueListFetch(productId, name, productType, {
+    brand: productUtils.getCardBrand(card) ?? undefined,
     // A card is on its own: the list page's embedded data holds no products,
     // so the card's own text is all there is — and the country is the part of
     // it the product page can be relied on to agree with.
@@ -282,6 +288,7 @@ async function tryInsertOnProductPage(force = false) {
       productType,
       true,
       {
+        brand: productUtils.getProductBrand() ?? undefined,
         country: productUtils.getProductCountry(productId) ?? undefined,
         producer: productUtils.getProducer(productId) ?? undefined
       }

@@ -113,10 +113,21 @@ external fetches are delegated to the background script.
 6. Back in `content.ts`, `handleRating` dispatches on `RatingResultStatus` and
    `domUtils.ts` renders the rating card (`#rating-container`) into the page.
 
+**Rum and whisky** (`spirits.ts`) come from RumX (out of 10) and Connosr (out
+of 100), which offer no search the extension may use. The background reads
+each site's sitemap (cached a week), matches strictly — every word of the
+brand and of Systembolaget's title in the hit, the same age, at most one
+extra word after any producer prefix, no unnamed special edition — and reads
+the matched page's schema.org `aggregateRating`. Both are off by default; the
+popup asks for the optional host permission when one is switched on, and the
+background checks it before every lookup. Products are told apart by category
+(`spiritType`), since every spirit shares `/produkt/sprit/`. `sources.ts`
+holds what differs per rating site (name, scale, icons, link labels).
+
 **Popup** (`entrypoints/popup/`) is a plain HTML/TS toggle UI backed by the
-four `sync:`-scoped storage items in `settings.ts` (`featuresEnabled`,
-`wineFeatureEnabled`, `beerFeatureEnabled`, `ciderFeatureEnabled`, all default
-`true`). The content script reads these before doing any work.
+`sync:`-scoped storage items in `settings.ts` (`featuresEnabled`,
+`wineFeatureEnabled`, `beerFeatureEnabled`, `ciderFeatureEnabled`, default
+`true`; `rumFeatureEnabled`, `whiskyFeatureEnabled`, default `false`). The content script reads these before doing any work.
 
 **Shared types** live in `src/@types/types.ts` — `ProductType` and
 `RatingResultStatus` enums plus the `RatingRequest`/`RatingResponse` message

@@ -10,6 +10,8 @@ import {
   beerFeatureEnabled,
   ciderFeatureEnabled,
   featuresEnabled,
+  rumFeatureEnabled,
+  whiskyFeatureEnabled,
   wineFeatureEnabled
 } from '@/components/settings'
 import {
@@ -125,6 +127,44 @@ async function initialize(): Promise<void> {
   }
 }
 
+// Rum and whisky ratings are read from RumX and Connosr, which the extension
+// may only reach once the user allows it: switching one on asks the browser
+// for that site, and is undone if the user says no. The request has to come
+// straight from the click, so it is the first thing the handler does. The
+// setting is saved as on before the answer: Firefox closes the popup when it
+// shows its prompt, so the code after it may never run — and the background
+// checks the permission itself before reading either site.
+async function setupSpiritToggle(
+  id: string,
+  setting: typeof rumFeatureEnabled,
+  origin: string
+): Promise<void> {
+  const toggle = document.getElementById(id) as HTMLInputElement
+  const note = document.getElementById('spiritNote')
+  const permitted = await browser.permissions.contains({ origins: [origin] })
+  toggle.checked = (await setting.getValue()) && permitted
+  toggle.addEventListener('change', () => {
+    if (!toggle.checked) {
+      void setting.setValue(false)
+      return
+    }
+    void setting.setValue(true)
+    void browser.permissions
+      .request({ origins: [origin] })
+      .catch(() => false)
+      .then(async (granted) => {
+        toggle.checked = granted
+        await setting.setValue(granted)
+        if (note) {
+          note.hidden = granted
+          note.textContent = granted
+            ? ''
+            : 'Betygen hämtas bara om du tillåter Bolaget+ att läsa sidan.'
+        }
+      })
+  })
+}
+
 // What the extension keeps on this device: the day-long rating cache, and the
 // matches the user picked by hand. Either can be cleared from here — the cache
 // to force fresh lookups, the picks to hand every product back to automatic
@@ -213,6 +253,13 @@ async function setupToggles(): Promise<void> {
   ciderToggle.addEventListener('change', () => {
     void ciderFeatureEnabled.setValue(ciderToggle.checked)
   })
+
+  await setupSpiritToggle('rum', rumFeatureEnabled, 'https://rumx.com/*')
+  await setupSpiritToggle(
+    'whisky',
+    whiskyFeatureEnabled,
+    'https://www.connosr.com/*'
+  )
 }
 
 async function shareExtension(): Promise<void> {
@@ -243,7 +290,7 @@ function showVersion(): void {
 // The category switches do nothing while everything is off; say so instead of
 // leaving them looking live.
 function syncCategoryToggles(enabled: boolean): void {
-  for (const id of ['wine', 'beer', 'cider']) {
+  for (const id of ['wine', 'beer', 'cider', 'rum', 'whisky']) {
     const toggle = document.getElementById(id) as HTMLInputElement | null
     if (toggle) toggle.disabled = !enabled
   }

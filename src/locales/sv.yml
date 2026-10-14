@@ -7,6 +7,8 @@ enlargeLabel: Förstora etiketten
 extDescription: Se betyg från Vivino och Untappd direkt på Systembolaget.se – på produktsidan och i sortimentlistorna.
 extName: Bolaget+
 hideTasted: Dölj provade
+linkToConnosr: Länk till Connosr
+linkToRumx: Länk till RumX
 linkToUntappd: Länk till Untappd
 linkToVivino: Länk till Vivino
 loading: Laddar...
@@ -16,6 +18,8 @@ noRatingYet: Inte tillräckligt många betyg än
 notOnBottle: Vinet är inte på flaska
 of: av
 rating: Betyg
+searchAtConnosr: Sök hos Connosr
+searchAtRumx: Sök hos RumX
 searchAtUntappd: Sök hos Untappd
 searchAtVivino: Sök hos Vivino
 shrinkLabel: Förminska etiketten

@@ -36,6 +36,15 @@ Wine ratings come from [Vivino](https://www.vivino.com/), beer and cider ratings
 from [Untappd](https://untappd.com/). Each kind can be switched off in the
 extension's popup.
 
+**Rum and whisky** can be switched on there too: rum ratings come from
+[RumX](https://rumx.com/) (out of 10), whisky ratings from
+[Connosr](https://www.connosr.com/) (out of 100). Neither site has a search
+the extension can use, so Bolaget+ matches the name against the site's list
+of products and reads the one page it matched. Matching is strict: the age
+and every word of Systembolaget's name must agree, and anything less certain
+gets a search link instead of a rating. Switching either on asks your browser
+for permission to read that site.
+
 | Product lists | A beer | The popup |
 |---|---|---|
 | ![Rating badges on a list of red wines, sorted by rating](docs/screenshots/list.png) | ![Untappd rating on a beer page](docs/screenshots/product-beer.png) | ![The popup with its switches](docs/screenshots/popup.png) |
@@ -44,7 +53,9 @@ extension's popup.
 
 Bolaget+ has no server and collects no personal data. To find a rating it
 sends the name of the product you are viewing to Vivino's or Untappd's search,
-the same search their own websites use. Ratings, your tasted list and your corrections are stored in your
+the same search their own websites use. With rum or whisky switched on it also
+reads RumX's or Connosr's list of products (at most once a week) and the page
+of the product it matched. Ratings, your tasted list and your corrections are stored in your
 browser. Nothing is sent to Systembolaget beyond what your browser already
 loads when you visit the site.
 

@@ -7,6 +7,8 @@ enlargeLabel: Enlarge the label
 extDescription: See Vivino and Untappd ratings right on Systembolaget.se – on product pages and in the product lists.
 extName: Bolaget+
 hideTasted: Hide tasted
+linkToConnosr: Link to Connosr
+linkToRumx: Link to RumX
 linkToUntappd: Link to Untappd
 linkToVivino: Link to Vivino
 loading: Loading...
@@ -16,6 +18,8 @@ noRatingYet: Not enough ratings yet
 notOnBottle: The Wine isn't bottled.
 of: of
 rating: Rating
+searchAtConnosr: Search at Connosr
+searchAtRumx: Search at RumX
 searchAtUntappd: Search at Untappd
 searchAtVivino: Search at Vivino
 shrinkLabel: Shrink the label

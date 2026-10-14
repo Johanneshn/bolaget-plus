@@ -35,6 +35,9 @@ Suggested screenshot order: `product-wine.png`, `list.png`, `product-beer.png`,
 > • Ett litet betyg på de viner, öl och cidrar som Bolaget+ hittar
 > • Sortera det du har laddat efter betyg, eller efter Prisvärt – hur mycket bättre betyg en vara har än vad som är vanligt i dess prisklass
 >
+> Rom och whisky
+> Slå på i popupen för betyg från RumX (rom, av 10) och Connosr (whisky, av 100). Bolaget+ ber då om lov att läsa den sajten.
+>
 > Provade
 > • Markera det du har provat, så syns det i listorna, där Dölj provade gömmer det
 > • Läs in din incheckningshistorik från Untappd (Untappd Insider) så märks öl du redan druckit
@@ -68,6 +71,9 @@ Suggested screenshot order: `product-wine.png`, `list.png`, `product-beer.png`,
 > • A small rating on the wines, beers and ciders Bolaget+ finds
 > • Sort what you have loaded by rating, or by value – how much better a product is rated than is usual at its price
 >
+> Rum and whisky
+> Switch them on in the popup for ratings from RumX (rum, out of 10) and Connosr (whisky, out of 100). Bolaget+ then asks for permission to read that site.
+>
 > Tasted
 > • Mark what you have tasted; it is marked in the lists too, where "Dölj provade" hides it
 > • Import your Untappd check-in history (Untappd Insider) and beers you have had are marked for you
@@ -95,6 +101,7 @@ Suggested screenshot order: `product-wine.png`, `list.png`, `product-beer.png`,
     - Host access to `systembolaget.se`: to show ratings on its pages.
     - Host access to `images.vivino.com`, `thumbs.vivino.com`: label thumbnails, downloaded by the extension because the page blocks loading Vivino's images directly.
     - Host access to `untappd.com`: reads the search credentials Untappd's own search page ships, so beer lookups keep working when Untappd changes them.
+    - Optional host access to `rumx.com` and `www.connosr.com`: requested only when the user switches rum or whisky ratings on in the popup. Reads each site's product sitemap (at most weekly) and the matched product's page, for its rating.
 - **AMO reviewer notes:** the Firefox build also asks for `https://*.algolia.net/*`.
   Vivino's and Untappd's searches are Algolia indexes, and Firefox only lets an
   extension reach hosts it declares. The Chrome build needs no such permission,
