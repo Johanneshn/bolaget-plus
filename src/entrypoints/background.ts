@@ -6,7 +6,8 @@ import {
   type RatingRequest,
   type RatingResponse,
   RatingResultStatus,
-  type SearchConfigRequest
+  type SearchConfigRequest,
+  type SpiritAccessRequest
 } from '@/@types/types'
 import {
   fetchImageAsDataUrl,
@@ -57,6 +58,17 @@ function isSearchConfigMessage(
   )
 }
 
+function isSpiritAccessMessage(
+  message: unknown
+): message is SpiritAccessRequest {
+  return (
+    typeof message === 'object' &&
+    message !== null &&
+    'type' in message &&
+    message.type === 'spiritAccess'
+  )
+}
+
 browser.runtime.onMessage.addListener(async (message: unknown) => {
   // On Chrome the content script queries Algolia itself, so the only thing it
   // needs from here is the credentials; beer and cider never reach the switch
@@ -69,6 +81,9 @@ browser.runtime.onMessage.addListener(async (message: unknown) => {
   }
   if (isImageMessage(message)) {
     return await fetchImageAsDataUrl(message.url)
+  }
+  if (isSpiritAccessMessage(message)) {
+    return await spiritAllowed(message.query)
   }
   if (!isGetRatingMessage(message)) {
     return
@@ -101,11 +116,7 @@ async function lookUpSpirit(
   productName: string,
   brand: string | undefined
 ): Promise<RatingResponse> {
-  const origin = SPIRIT_ORIGINS[type]
-  const allowed =
-    origin !== undefined &&
-    (await browser.permissions.contains({ origins: [origin] }))
-  if (!allowed) {
+  if (!(await spiritAllowed(type))) {
     return {
       link: null,
       name: null,
@@ -116,4 +127,12 @@ async function lookUpSpirit(
     }
   }
   return await fetchSpiritRating(type, productName, brand)
+}
+
+async function spiritAllowed(type: ProductType): Promise<boolean> {
+  const origin = SPIRIT_ORIGINS[type]
+  return (
+    origin !== undefined &&
+    (await browser.permissions.contains({ origins: [origin] }))
+  )
 }

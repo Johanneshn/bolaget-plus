@@ -96,6 +96,13 @@ export interface SearchConfigRequest {
   type: 'untappdSearchConfig'
 }
 
+// Asks the background script whether the user has let the extension read the
+// site rating this kind of spirit; content scripts cannot ask the browser.
+export interface SpiritAccessRequest {
+  query: ProductType
+  type: 'spiritAccess'
+}
+
 export interface UntappdHit {
   beer_name: string
   beer_slug: string

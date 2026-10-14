@@ -8,6 +8,7 @@ import {
   RatingResponse,
   RatingResultStatus,
   SearchConfigRequest,
+  SpiritAccessRequest,
   UntappdSearchConfig
 } from '@/@types/types'
 
@@ -227,6 +228,21 @@ export function sourcePausedUntil(type: ProductType): number {
   loadBreakers()
   const breaker = breakers.get(sourceOf(type))
   return breaker && breaker.pausedUntil > Date.now() ? breaker.pausedUntil : 0
+}
+
+// Whether the user has let the extension read the site that rates this kind
+// of spirit. A setting switched on elsewhere and synced here, or a permission
+// revoked since, leaves the switch on without it; the page then shows nothing,
+// as if the switch were off, rather than "no rating" on every bottle.
+export async function spiritAccessGranted(type: ProductType): Promise<boolean> {
+  try {
+    return await browser.runtime.sendMessage<SpiritAccessRequest, boolean>({
+      query: type,
+      type: 'spiritAccess'
+    })
+  } catch {
+    return false
+  }
 }
 
 function loadBreakers() {
