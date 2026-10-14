@@ -4,6 +4,8 @@ import {
   type ImageRequest,
   ProductType,
   type RatingRequest,
+  type RatingResponse,
+  RatingResultStatus,
   type SearchConfigRequest
 } from '@/@types/types'
 import {
@@ -16,6 +18,7 @@ import {
   getSearchConfig,
   refreshSearchConfig
 } from '@/components/searchConfigCache'
+import { fetchSpiritRating, SPIRIT_ORIGINS } from '@/components/spirits'
 
 export default defineBackground(() => {
   // The MV3 service worker starts on browser launch and on events, so this
@@ -70,7 +73,7 @@ browser.runtime.onMessage.addListener(async (message: unknown) => {
   if (!isGetRatingMessage(message)) {
     return
   }
-  const { country, includeImage, producer, productName, query } = message
+  const { brand, country, includeImage, producer, productName, query } = message
   switch (query) {
     case ProductType.Beer:
     case ProductType.Cider:
@@ -79,6 +82,9 @@ browser.runtime.onMessage.addListener(async (message: unknown) => {
         await getSearchConfig(),
         refreshSearchConfig
       )
+    case ProductType.Rum:
+    case ProductType.Whisky:
+      return await lookUpSpirit(query, productName, brand)
     case ProductType.Wine:
       return await fetchRatingFromVivino(productName, includeImage ?? true, {
         country,
@@ -86,3 +92,28 @@ browser.runtime.onMessage.addListener(async (message: unknown) => {
       })
   }
 })
+
+// Rum and whisky come from sites the extension may only read once the user
+// has switched them on in the popup, which asks for the host permission.
+// Without it — never granted, or revoked since — nothing is fetched.
+async function lookUpSpirit(
+  type: ProductType,
+  productName: string,
+  brand: string | undefined
+): Promise<RatingResponse> {
+  const origin = SPIRIT_ORIGINS[type]
+  const allowed =
+    origin !== undefined &&
+    (await browser.permissions.contains({ origins: [origin] }))
+  if (!allowed) {
+    return {
+      link: null,
+      name: null,
+      rating: 0,
+      status: RatingResultStatus.NotFound,
+      transient: true,
+      votes: 0
+    }
+  }
+  return await fetchSpiritRating(type, productName, brand)
+}

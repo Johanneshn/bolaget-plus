@@ -73,6 +73,28 @@ describe('replaceCardSpinner', () => {
     ).toBe('4,1 av 5, 812 röster')
   })
 
+  // RumX rates out of 10 and Connosr out of 100: shown on their own scale,
+  // sorted on a common one.
+  it("shows a rating on its source's own scale", () => {
+    const card = renderCard('203701')
+    const spinner = injectCardSpinner(card, '203701')
+    if (!spinner) throw new Error('spinner not injected')
+    replaceCardSpinner(card, spinner, '203701', ProductType.Whisky, {
+      link: 'https://www.connosr.com/lagavulin-16-year-old-whisky-reviews-147',
+      name: 'Lagavulin 16 Year Old',
+      rating: 89.62,
+      scale: 100,
+      status: RatingResultStatus.Found,
+      votes: 475
+    })
+
+    expect(card.querySelector('.bp-card-score')?.textContent).toBe('89,6')
+    expect(
+      card.querySelector('.bp-card-rating')?.getAttribute('aria-label')
+    ).toBe('89,6 av 100, 475 röster')
+    expect(Number((card as HTMLElement).dataset.bpRating)).toBeCloseTo(4.481)
+  })
+
   it('shows a score of 0 as not rated yet, not as zero', () => {
     // Vivino reports an average of 0 for a wine with too few ratings.
     expect(badge(renderCard('203701'), 0, 24)).toBe('–')

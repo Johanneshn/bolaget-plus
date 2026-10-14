@@ -17,7 +17,7 @@ export default defineConfig({
       }
     },
     content_security_policy: {
-      extension_pages: `script-src 'self'; object-src 'self'; connect-src 'self' https://images.vivino.com https://thumbs.vivino.com https://untappd.com${browser === 'firefox' ? ' https://*.algolia.net' : ''}${isProduction ? '' : ' ws://localhost:3000/'};`
+      extension_pages: `script-src 'self'; object-src 'self'; connect-src 'self' https://images.vivino.com https://thumbs.vivino.com https://untappd.com https://rumx.com https://www.connosr.com${browser === 'firefox' ? ' https://*.algolia.net' : ''}${isProduction ? '' : ' ws://localhost:3000/'};`
     },
     default_locale: 'sv',
     // The stores show these as the listing's name and summary (the Chrome Web
@@ -40,6 +40,23 @@ export default defineConfig({
       // CORS allows, so only that build has to ask.
       ...(browser === 'firefox' ? ['https://*.algolia.net/*'] : [])
     ],
+    // Rum and whisky ratings are read from RumX and Connosr only once the user
+    // switches them on in the popup, which asks for these then — so nobody is
+    // asked at install or update, and nobody who leaves them off gives them.
+    // (MV2, the Firefox build, keeps host permissions under the plain key.)
+    ...(browser === 'firefox'
+      ? {
+          optional_permissions: [
+            'https://rumx.com/*',
+            'https://www.connosr.com/*'
+          ]
+        }
+      : {
+          optional_host_permissions: [
+            'https://rumx.com/*',
+            'https://www.connosr.com/*'
+          ]
+        }),
     icons: {
       16: 'icons/16.png',
       32: 'icons/32.png',

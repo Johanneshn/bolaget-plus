@@ -11,6 +11,7 @@ const CARD_TITLE_SELECTOR = '[data-slot="product-summary-title"]'
 const CARD_SUBTITLE_SELECTOR = '[data-slot="product-summary-subtitle"]'
 const CARD_COUNTRY_SELECTOR = '[data-slot="product-summary-country"]'
 const CARD_METADATA_SELECTOR = '[data-slot="product-summary-metadata"]'
+const CARD_CATEGORY_SELECTOR = '[data-slot="product-summary-category"]'
 // The visible price ("249:-"); the screen-reader twin says "249 kronor".
 const CARD_PRICE_SELECTOR =
   '[data-slot="product-summary-price"] [aria-hidden="true"]'
@@ -34,6 +35,19 @@ export function getCard(link: Element): Element {
   return link.closest(CARD_SELECTOR) ?? link
 }
 
+// The card's name without its subtitle: "Glenmorangie" of "Glenmorangie,
+// 12 Years". Rum and whisky are matched on it.
+export function getCardBrand(card: Element): null | string {
+  const title = card.querySelector(CARD_TITLE_SELECTOR)
+  if (!title) return null
+  // The title link holds the name twice: once for the eye (aria-hidden) and
+  // once, with subtitle and packaging appended, for screen readers.
+  const name = (
+    title.querySelector('[aria-hidden="true"]') ?? title
+  ).textContent.trim()
+  return name || null
+}
+
 // A list card's country, as an ISO alpha-2 code. The embedded page data does
 // not cover list pages at all — /sortiment/ ships CMS content only and fetches
 // its products client-side — so the card's own country line ("Italien", next
@@ -47,14 +61,7 @@ export function getCardCountry(card: Element): null | string {
 }
 
 export function getCardName(card: Element): null | string {
-  const title = card.querySelector(CARD_TITLE_SELECTOR)
-  if (!title) return null
-
-  // The title link holds the name twice: once for the eye (aria-hidden) and
-  // once, with subtitle and packaging appended, for screen readers.
-  const name = (
-    title.querySelector('[aria-hidden="true"]') ?? title
-  ).textContent.trim()
+  const name = getCardBrand(card)
   if (!name) return null
 
   const subtitle =
@@ -95,6 +102,9 @@ export function getCardProductType(card: Element): ProductType {
   if (href.includes('/produkt/vin/')) return ProductType.Wine
   if (href.includes('/produkt/ol/')) return ProductType.Beer
   if (href.includes('/produkt/cider-blanddrycker/')) return ProductType.Cider
+  if (href.includes('/produkt/sprit/')) {
+    return spiritType(card.querySelector(CARD_CATEGORY_SELECTOR)?.textContent)
+  }
   return ProductType.Uncertain
 }
 
@@ -104,6 +114,14 @@ export function getCardProductType(card: Element): ProductType {
 // the lookup then falls back to judging the title alone, as it always has.
 export function getProducer(productId: string): null | string {
   return getProductFromPageData(productId)?.producer ?? null
+}
+
+// The product page's name without its subtitle, as getCardBrand.
+export function getProductBrand(): null | string {
+  const first = document.querySelector('main h1')?.children[0]
+  const name = first?.textContent.trim()
+  if (!name) return null
+  return name
 }
 
 // The product page's country, as an ISO alpha-2 code.
@@ -148,6 +166,13 @@ export function getProductType(): ProductType {
     return ProductType.Cider
   }
 
+  if (url.includes('/produkt/sprit/')) {
+    // The categories are the links right above the name.
+    return spiritType(
+      document.querySelector('main h1')?.previousElementSibling?.textContent
+    )
+  }
+
   return ProductType.Uncertain
 }
 
@@ -157,6 +182,17 @@ export function getProductVintage(): null | string {
   const subtitle = document.querySelector('main h1')?.children[1]
   const last = subtitle?.textContent.split(',').pop()?.trim() ?? ''
   return VINTAGE_ONLY.test(last) ? last : null
+}
+
+// Rum or whisky, from the category Systembolaget files a spirit under; every
+// spirit shares one URL path. The card names the narrowest category ("Ljus
+// rom", "Maltwhisky", "Bourbon"), the product page all of them ("Sprit,
+// Whisky, Maltwhisky"). Other spirits have no rating source.
+export function spiritType(category: null | string | undefined): ProductType {
+  const text = category?.toLowerCase() ?? ''
+  if (/whisk|bourbon/.test(text)) return ProductType.Whisky
+  if (/\brom\b|sockerrörssprit/.test(text)) return ProductType.Rum
+  return ProductType.Uncertain
 }
 
 // Wine formats that are not a bottle and have no comparable Vivino rating.

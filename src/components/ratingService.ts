@@ -14,6 +14,7 @@ import {
 import { fetchRatingFromUntappd, fetchRatingFromVivino } from './api'
 import { getPinnedRating } from './pinnedMatches'
 import { saveRating as cacheRating, tryGetRating } from './ratingsCache'
+import { type RatingSource, sourceFor } from './sources'
 
 export async function fetchRating(
   productId: string,
@@ -68,7 +69,13 @@ export async function fetchRating(
 async function fetchFromSource(
   ratingRequest: RatingRequest
 ): Promise<RatingResponse> {
-  if (import.meta.env.FIREFOX) {
+  // Rum and whisky are read from their sites by the background on either
+  // browser: it holds the host permissions the popup asks for.
+  if (
+    import.meta.env.FIREFOX ||
+    ratingRequest.query === ProductType.Rum ||
+    ratingRequest.query === ProductType.Whisky
+  ) {
     return await browser.runtime.sendMessage<RatingRequest, RatingResponse>(
       ratingRequest
     )
@@ -155,10 +162,19 @@ interface Breaker {
   // again at once.
   tripped: boolean
 }
-const breakers = new Map<'untappd' | 'vivino', Breaker>()
+const breakers = new Map<RatingSource['id'], Breaker>()
 // Kept for the tab, not just the page: product links are full page loads, and
 // each load would otherwise grant a banned site five fresh queries.
 const BREAKERS_KEY = 'bolaget-plus:breakers'
+const BREAKER_SOURCES: readonly string[] = [
+  'connosr',
+  'rumx',
+  'untappd',
+  'vivino'
+] satisfies RatingSource['id'][]
+function isBreakerSource(source: string): source is RatingSource['id'] {
+  return BREAKER_SOURCES.includes(source)
+}
 let breakersLoaded = false
 
 export async function enqueueListFetch(
@@ -224,7 +240,7 @@ function loadBreakers() {
     )) {
       // Only a whole breaker: a missing number would pause for NaN — never.
       if (
-        (source === 'untappd' || source === 'vivino') &&
+        isBreakerSource(source) &&
         [breaker.failures, breaker.nextPause, breaker.pausedUntil].every(
           Number.isFinite
         )
@@ -277,6 +293,6 @@ function saveBreakers() {
   }
 }
 
-function sourceOf(type: ProductType): 'untappd' | 'vivino' {
-  return type === ProductType.Wine ? 'vivino' : 'untappd'
+function sourceOf(type: ProductType): RatingSource['id'] {
+  return sourceFor(type).id
 }

@@ -12,7 +12,8 @@ import {
   getProducer,
   getProductName,
   getProductVintage,
-  isCardBottle
+  isCardBottle,
+  spiritType
 } from '@/components/productUtils'
 
 // A list card as Systembolaget renders it: a tile whose title link carries the
@@ -345,5 +346,34 @@ describe('the list card and the product page agree', () => {
     // Asserted rather than implied: two nulls would satisfy the comparison.
     expect(getCardName(card)).not.toBeNull()
     expect(getCardName(card)).toBe(getProductName())
+  })
+})
+
+describe('telling rum and whisky apart', () => {
+  // Every spirit shares /produkt/sprit/; only its category tells.
+  it('reads the category a card or product page names', () => {
+    expect(spiritType('Ljus rom')).toBe(ProductType.Rum)
+    expect(spiritType('Mörk rom & Lagrad sockerrörssprit')).toBe(
+      ProductType.Rum
+    )
+    expect(spiritType('Sprit,Rom & Lagrad sockerrörssprit,Mörk rom')).toBe(
+      ProductType.Rum
+    )
+    expect(spiritType('Maltwhisky')).toBe(ProductType.Whisky)
+    expect(spiritType('Blended whiskey')).toBe(ProductType.Whisky)
+    expect(spiritType('Bourbon')).toBe(ProductType.Whisky)
+    expect(spiritType('Sprit,Whisky,Maltwhisky')).toBe(ProductType.Whisky)
+  })
+
+  it('leaves other spirits alone', () => {
+    for (const category of [
+      'Gin',
+      'Cognac',
+      'Vodka',
+      'Likör',
+      'Aromatiserad sprit'
+    ]) {
+      expect(spiritType(category), category).toBe(ProductType.Uncertain)
+    }
   })
 })

@@ -1,7 +1,9 @@
 export enum ProductType {
   Beer = 'beer',
   Cider = 'cider',
+  Rum = 'rum',
   Uncertain = 'uncertain',
+  Whisky = 'whisky',
   Wine = 'wine'
 }
 
@@ -27,6 +29,12 @@ export interface ImageRequest {
 // is always readable — a list card and a product page expose different things
 // — so every rule that uses one must treat it as absent without complaint.
 export interface ProductFacts {
+  // The product's own name without its subtitle ("Glenmorangie" of
+  // "Glenmorangie 12 Years"). Rum and whisky are matched on it: the brand must
+  // be in the hit, the rest of the title may be worded differently. Not a fact
+  // the cache compares (see FACT_KEYS in ratingsCache.ts): it is part of the
+  // name, which every view reads the same.
+  brand?: string
   // ISO alpha-2, folded from the Swedish country name Systembolaget prints
   // ("Spanien" → "es"). Rules out a same-named wine from another country.
   country?: string
@@ -63,6 +71,10 @@ export interface RatingResponse {
   // lookup.
   pinned?: boolean
   rating: number
+  // The top of the source's scale: 5 for Vivino and Untappd (the default),
+  // 10 for RumX, 100 for Connosr. Ratings are shown on their own scale and
+  // compared, in a list, as a share of it.
+  scale?: number
   status: RatingResultStatus
   // Set when the result reflects a transient failure (rate limit, network
   // error) rather than a definitive lookup miss — never cached, so the next

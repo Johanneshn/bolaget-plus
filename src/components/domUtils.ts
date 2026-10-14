@@ -11,6 +11,7 @@ import {
   getCardPricePerLitre,
   getCardProductId
 } from '@/components/productUtils'
+import { onFivePointScale, sourceFor } from '@/components/sources'
 import { t } from '@/components/strings'
 
 const RATING_CONTAINER_ID = 'rating-container'
@@ -461,16 +462,16 @@ export function setRating(
   stars.className = 'bp-stars'
   stars.setAttribute('role', 'img')
   stars.setAttribute('aria-label', ratingLabel(rating))
-  stars.appendChild(createRatingIcons(productType, rating.rating))
+  stars.appendChild(createRatingIcons(productType, rating.rating, rating.scale))
 
   const score = document.createElement('span')
   score.setAttribute('aria-hidden', 'true')
-  score.appendChild(createScore(rating.rating, 'bp-score'))
+  score.appendChild(createScore(rating.rating, 'bp-score', rating.scale))
   // A score of 0 means the source has too few ratings to compute one yet.
   if (rating.rating > 0) {
     const scale = document.createElement('span')
     scale.className = 'bp-scale'
-    scale.textContent = ' / 5'
+    scale.textContent = ` / ${String(rating.scale ?? 5)}`
     score.appendChild(scale)
   }
 
@@ -486,15 +487,14 @@ export function setRating(
   const meta = document.createElement('div')
   meta.className = 'bp-meta'
   meta.innerText = `${formatCount(rating.votes)} ${t('votes')}`
-  if (productType !== ProductType.Wine) {
+  if (productType === ProductType.Beer || productType === ProductType.Cider) {
     const beerRating = rating as BeerResponse
     if (beerRating.brewery) {
       meta.innerText += ` · ${beerRating.brewery}`
     }
   }
 
-  const linkLabel =
-    productType === ProductType.Wine ? t('linkToVivino') : t('linkToUntappd')
+  const linkLabel = t(sourceFor(productType).linkLabel)
 
   const footer = document.createElement('div')
   footer.className = 'bp-footer'
@@ -573,10 +573,7 @@ export function setUncertain(
     )
   }
 
-  const linkLabel =
-    productType === ProductType.Wine
-      ? t('searchAtVivino')
-      : t('searchAtUntappd')
+  const linkLabel = t(sourceFor(productType).searchLabel)
 
   const footer = document.createElement('div')
   footer.className = 'bp-footer'
@@ -815,10 +812,14 @@ function nextGradientId(): string {
 
 // What a screen reader should say for a score shown as stars: "3.9 av 5, 412
 // röster" rather than five unlabelled images and a bare number.
-function ratingLabel(rating: { rating: number; votes: number }): string {
+function ratingLabel(rating: {
+  rating: number
+  scale?: number
+  votes: number
+}): string {
   const score =
     rating.rating > 0
-      ? `${formatScore(rating.rating)} ${t('of')} 5`
+      ? `${formatScore(rating.rating, rating.scale)} ${t('of')} ${String(rating.scale ?? 5)}`
       : t('noRatingYet')
   return `${score}, ${formatCount(rating.votes)} ${t('votes')}`
 }
@@ -1189,16 +1190,21 @@ export function replaceCardSpinner(
   votes.className = 'bp-card-votes'
   votes.textContent = `(${formatCount(rating.votes)})`
   badge.append(
-    createRatingIcons(productType, rating.rating),
-    createScore(rating.rating, 'bp-card-score'),
+    createRatingIcons(productType, rating.rating, rating.scale),
+    createScore(rating.rating, 'bp-card-score', rating.scale),
     votes
   )
   // The SPA may have re-rendered the card's contents while the rating request
   // was in flight, detaching the spinner or putting another product in the
   // tile — so re-check both instead of replacing a node that may be gone.
   if (card.querySelector(`.${CARD_RATING_CLASS}`)) return
-  if (getCardProductId(card) !== productId) return
-  ;(card as HTMLElement).dataset.bpRating = rating.rating.toString()
+  if (getCardProductId(card) !== productId)
+    return // Compared on a five-point scale, so a sorted list of mixed sources (a
+    // RumX 7,4/10 beside a Vivino 3,9/5) is in the right order.
+  ;(card as HTMLElement).dataset.bpRating = onFivePointScale(
+    rating.rating,
+    rating.scale
+  ).toString()
   findCardAnchor(card)?.insertAdjacentElement('afterend', badge)
 }
 
@@ -1229,11 +1235,16 @@ export function valueScores(
 // Stars (wine) or bottle caps (beer, cider) for a score. The icons are our own
 // static SVG markup, parsed rather than assigned through innerHTML: Mozilla's
 // add-on review flags every innerHTML assignment, trusted or not.
-function createRatingIcons(productType: ProductType, score: number): Node {
+function createRatingIcons(
+  productType: ProductType,
+  score: number,
+  scale = 5
+): Node {
+  const fivePoint = onFivePointScale(score, scale)
   const markup =
-    productType === ProductType.Wine
-      ? generateStarsSvg(score)
-      : generateCapSvg(score)
+    sourceFor(productType).icons === 'stars'
+      ? generateStarsSvg(fivePoint)
+      : generateCapSvg(fivePoint)
   const fragment = document.createDocumentFragment()
   fragment.append(
     ...new DOMParser().parseFromString(markup, 'text/html').body.childNodes
@@ -1271,6 +1282,10 @@ const scoreFormat = new Intl.NumberFormat('sv-SE', {
   maximumFractionDigits: 2,
   minimumFractionDigits: 1
 })
+const wideScoreFormat = new Intl.NumberFormat('sv-SE', {
+  maximumFractionDigits: 1,
+  minimumFractionDigits: 1
+})
 const countFormat = new Intl.NumberFormat('sv-SE')
 
 // Shown where the source has too few ratings for a score; the reason is in
@@ -1280,11 +1295,11 @@ const NO_SCORE = '–'
 // The score as text. A score of 0 means the source has too few ratings to
 // compute one yet — Vivino withholds the average below about 25 ratings — not
 // that it is rated zero, so it reads as a dash with the reason on hover.
-function createScore(score: number, className: string): HTMLElement {
+function createScore(score: number, className: string, scale = 5): HTMLElement {
   const element = document.createElement('span')
   element.className = className
   if (score > 0) {
-    element.textContent = formatScore(score)
+    element.textContent = formatScore(score, scale)
   } else {
     element.textContent = NO_SCORE
     element.title = t('noRatingYet')
@@ -1303,8 +1318,10 @@ function formatCount(count: number): string {
   return countFormat.format(count)
 }
 
-function formatScore(score: number): string {
-  return scoreFormat.format(score)
+// Two decimals where the scale is five points (Untappd's 3,67), one on a
+// longer scale (RumX's 7,4, Connosr's 89,6).
+function formatScore(score: number, scale = 5): string {
+  return (scale > 5 ? wideScoreFormat : scoreFormat).format(score)
 }
 
 function generateStarsSvg(rating: number): string {
@@ -1365,8 +1382,6 @@ function insertCardSearch(
   link.target = '_blank'
   link.rel = 'noopener noreferrer'
   link.title = t('uncertainMatch')
-  link.textContent = t(
-    productType === ProductType.Wine ? 'searchAtVivino' : 'searchAtUntappd'
-  )
+  link.textContent = t(sourceFor(productType).searchLabel)
   findCardAnchor(card)?.insertAdjacentElement('afterend', link)
 }
