@@ -120,7 +120,10 @@ brand and of Systembolaget's title in the hit, the same age, at most one
 extra word after any producer prefix, no unnamed special edition — and reads
 the matched page's schema.org `aggregateRating`. Both are off by default; the
 popup asks for the optional host permission when one is switched on, and the
-background checks it before every lookup. Products are told apart by category
+background checks it before every lookup. The content script asks the
+background too (`spiritAccessGranted`) and treats a switch that is on without
+the permission — synced from another browser, or revoked — as off, so the
+page shows nothing rather than "no rating". Products are told apart by category
 (`spiritType`), since every spirit shares `/produkt/sprit/`. `sources.ts`
 holds what differs per rating site (name, scale, icons, link labels).
 

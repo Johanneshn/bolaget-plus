@@ -16,7 +16,8 @@ import * as productUtils from '@/components/productUtils'
 import {
   enqueueListFetch,
   fetchRating,
-  sourcePausedUntil
+  sourcePausedUntil,
+  spiritAccessGranted
 } from '@/components/ratingService'
 import {
   beerFeatureEnabled,
@@ -68,9 +69,15 @@ async function featureEnabled(productType: ProductType): Promise<boolean> {
     case ProductType.Cider:
       return await ciderFeatureEnabled.getValue()
     case ProductType.Rum:
-      return await rumFeatureEnabled.getValue()
+      return (
+        (await rumFeatureEnabled.getValue()) &&
+        (await spiritAccessGranted(productType))
+      )
     case ProductType.Whisky:
-      return await whiskyFeatureEnabled.getValue()
+      return (
+        (await whiskyFeatureEnabled.getValue()) &&
+        (await spiritAccessGranted(productType))
+      )
     case ProductType.Wine:
       return await wineFeatureEnabled.getValue()
     default:
