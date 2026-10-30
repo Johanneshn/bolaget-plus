@@ -961,6 +961,7 @@ function positionZoomPreview(
 }
 
 const CARD_RATING_CLASS = 'bp-card-rating'
+const CARD_TILE_SELECTOR = '[data-slot="product-tile"]'
 
 // A badge or spinner names the product it was made for, since the SPA may
 // re-render a tile for another product (a new sort or filter) and keep the old
@@ -985,7 +986,11 @@ export interface ListView {
 // not a bad rating) and, when sorting, keep their place after the rated ones.
 export function applyListView(list: Element, view: ListView): void {
   const items = [...list.children].map((item) => {
-    const tile = item.querySelector<HTMLElement>('[data-slot="product-tile"]')
+    // The grid item is the tile itself, or — in the markup before October
+    // 2026 — an <li> around it.
+    const tile = item.matches(CARD_TILE_SELECTOR)
+      ? (item as HTMLElement)
+      : item.querySelector<HTMLElement>(CARD_TILE_SELECTOR)
     return {
       element: item as HTMLElement,
       pricePerLitre: tile ? getCardPricePerLitre(tile) : null,

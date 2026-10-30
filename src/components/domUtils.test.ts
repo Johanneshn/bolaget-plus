@@ -375,6 +375,25 @@ describe('sorting a result list', () => {
     expect(list.hasAttribute('style')).toBe(false)
   })
 
+  it('sorts tiles that are the grid items themselves, with no <li> around them', () => {
+    document.body.innerHTML = `<ul>
+      <div id="a" data-slot="product-tile" data-bp-rating="3.6"></div>
+      <div id="b" data-slot="product-tile"></div>
+      <div id="c" data-slot="product-tile" data-bp-rating="4.2" data-bp-tasted="true"></div>
+    </ul>`
+    const list = document.querySelector('ul')
+    if (!list) throw new Error('list not rendered')
+    const tile = (id: string) => document.getElementById(id)?.style
+    applyListView(list, { hideTasted: false, sortBy: 'rating' })
+
+    expect(Number(tile('c')?.order)).toBeLessThan(Number(tile('a')?.order))
+    expect(Number(tile('a')?.order)).toBeLessThan(0)
+    expect(tile('b')?.order).toBe('')
+
+    applyListView(list, { hideTasted: true, sortBy: 'none' })
+    expect(tile('c')?.display).toBe('none')
+  })
+
   it('reports the chosen sort and tasted filter from its controls', () => {
     const list = renderList([{ rating: 4.2 }])
     const changes: unknown[] = []
