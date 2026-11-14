@@ -152,6 +152,22 @@ test('visiting a wine page shows rating-container with ratings and stars', async
   await expect(vivinoLink).toBeVisible()
 })
 
+// A card is only looked up once it scrolls into view, and not every card gets
+// a badge: wine in a box is skipped. When the top of the list is all boxes (as
+// in November 2026, when two new 3-litre boxes led /sortiment/vin/ and the
+// first bottles sat just below the fold) waiting on the initial viewport times
+// out although the extension works. So scroll down the list, as a visitor
+// would, until a badge turns up.
+async function expectBadgeWhileScrolling(page: Page): Promise<void> {
+  const badge = page.locator('.bp-card-rating').first()
+  await expect(async () => {
+    if (!(await badge.isVisible())) await page.mouse.wheel(0, 400)
+    await expect(badge).toBeVisible({ timeout: 3_000 })
+  }, 'No rating badge on any card after scrolling down the list').toPass({
+    timeout: RATING_TIMEOUT
+  })
+}
+
 // A list card is found by its data-slot names; when Systembolaget renames
 // them (as it did in October 2026, when the old a[id^="tile:"] links went),
 // every list test would otherwise just time out waiting for a badge. Asserting
@@ -184,7 +200,6 @@ for (const [label, path, toggle] of [
     await openPage(page, `https://www.systembolaget.se${path}`)
     await expectProductTiles(page)
 
-    await page.waitForSelector('.bp-card-rating', { timeout: RATING_TIMEOUT })
-    await expect(page.locator('.bp-card-rating').first()).toBeVisible()
+    await expectBadgeWhileScrolling(page)
   })
 }
