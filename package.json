@@ -34,14 +34,14 @@
     "@wxt-dev/auto-icons": "^1.1.2",
     "eslint": "^9.39.4",
     "eslint-plugin-perfectionist": "^4.15.1",
-    "happy-dom": "^20.11.1",
+    "happy-dom": "^21.0.4",
     "playwright": "^1.61.0",
     "prettier": "^3.8.4",
-    "puppeteer-core": "^24.43.1",
+    "puppeteer-core": "^25.18.1",
     "simple-git-hooks": "^2.13.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.61.1",
-    "vitest": "^4.1.11",
+    "typescript-eslint": "^8.74.0",
+    "vitest": "^4.1.12",
     "webextension-polyfill": "^0.12.0",
     "wxt": "^0.20.26"
   },
@@ -63,11 +63,16 @@
       "esbuild@>=0.27.0 <0.28.0": "^0.28.1",
       "js-yaml@4": "^4.3.2",
       "nanoid@3": "^3.3.18",
+      "node-forge": "^1.4.3",
       "postcss": "^8.5.18",
       "sharp": "^0.35.4",
-      "shell-quote": "^1.10.0",
+      "shell-quote": "^1.11.0",
+      "source-map-js": "^1.2.2",
       "tmp": "^0.2.7",
-      "uuid@8": "^11.1.1"
+      "uuid@8": "^11.1.1",
+      "vite@6": "^6.4.4",
+      "vite@8": "^8.1.6",
+      "zod@4": "^4.6.6"
     }
   }
 }
